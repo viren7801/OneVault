@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Bell, Check, ChevronRight, CircleDollarSign, LockKeyhole, LogOut, Menu, NotebookPen, Plus, Search, ShieldCheck, Trash2, WalletCards, X } from 'lucide-react'
 import { supabase } from './lib/supabase'
 
