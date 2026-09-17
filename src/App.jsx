@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Bell, Check, ChevronRight, CircleDollarSign, LockKeyhole, LogOut, Menu, NotebookPen, Plus, Search, ShieldCheck, Trash2, WalletCards, X } from 'lucide-react'
+import {
+  Bell, Check, ChevronRight, CircleDollarSign, CreditCard, Edit3, Filter,
+  LockKeyhole, LogOut, Menu, NotebookPen, Plus, Search, ShieldCheck,
+  Trash2, WalletCards, X, TrendingDown, TrendingUp, PiggyBank, RefreshCw,
+} from 'lucide-react'
 import { supabase } from './lib/supabase'
 
 const modules = [
@@ -8,25 +12,32 @@ const modules = [
   { id: 'passwords', label: 'Passwords', icon: LockKeyhole, description: 'Private credentials vault' },
   { id: 'notes', label: 'Notes', icon: NotebookPen, description: 'Quick notes & lists' },
 ]
-const categories = ['Food','Shopping','Transport','Bills','Entertainment','Health','Travel','Other']
-const money = (n) => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(n || 0)
+
+const categories = ['Food', 'Shopping', 'Transport', 'Bills', 'Entertainment', 'Health', 'Travel', 'Other']
+const accountTypes = ['Cash', 'Bank', 'Credit Card', 'Wallet', 'Investment', 'Other']
+const money = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(n) || 0)
+const monthStart = (offset = 0) => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth() + offset, 1) }
+const monthKey = (d) => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}` }
+const monthLabel = (d) => new Date(d).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
 
 function AuthScreen({ onSignedIn }) {
-  const [email,setEmail]=useState(import.meta.env.VITE_ALLOWED_EMAIL || '')
-  const [password,setPassword]=useState('')
-  const [busy,setBusy]=useState(false)
-  const [error,setError]=useState('')
-  async function submit(e){
+  const [email, setEmail] = useState(import.meta.env.VITE_ALLOWED_EMAIL || '')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function submit(e) {
     e.preventDefault(); setBusy(true); setError('')
     try {
-      const allowed=import.meta.env.VITE_ALLOWED_EMAIL?.trim().toLowerCase()
-      if(allowed && email.trim().toLowerCase()!==allowed) throw new Error('This oneVault build is restricted to the owner account.')
-      const {data,error}=await supabase.auth.signInWithPassword({email:email.trim(),password})
-      if(error) throw error
+      const allowed = import.meta.env.VITE_ALLOWED_EMAIL?.trim().toLowerCase()
+      if (allowed && email.trim().toLowerCase() !== allowed) throw new Error('This oneVault build is restricted to the owner account.')
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+      if (error) throw error
       onSignedIn(data.user)
-    } catch(err){ setError(err.message || 'Unable to sign in.') }
-    finally{ setBusy(false) }
+    } catch (err) { setError(err.message || 'Unable to sign in.') }
+    finally { setBusy(false) }
   }
+
   return <div className="auth-page"><div className="ambient ambient-one"/><div className="ambient ambient-two"/><div className="auth-card">
     <div className="brand-row"><div className="brand-mark">1</div><div><div className="brand-title">oneVault</div><div className="brand-subtitle">Private personal workspace</div></div></div>
     <div className="auth-icon"><ShieldCheck size={24}/></div><div className="panel-kicker">PRIVATE ACCESS</div><h1>Welcome back.</h1><p className="auth-copy">Sign in to your personal oneVault. There is no public registration.</p>
@@ -35,55 +46,240 @@ function AuthScreen({ onSignedIn }) {
   </div></div>
 }
 
-function ExpenseModal({user,onClose,onSaved}){
-  const [amount,setAmount]=useState(''),[category,setCategory]=useState('Food'),[description,setDescription]=useState(''),[spentAt,setSpentAt]=useState(new Date().toISOString().slice(0,16)),[busy,setBusy]=useState(false),[error,setError]=useState('')
-  async function save(e){
-    e.preventDefault(); setError(''); const value=Number(amount)
-    if(!value || value<=0){setError('Enter an amount greater than ₹0.');return}
-    setBusy(true)
-    const {data,error}=await supabase.from('expenses').insert({user_id:user.id,amount:value,type:'expense',category,description:description.trim()||null,spent_at:new Date(spentAt).toISOString()}).select().single()
-    if(error) setError(error.message); else onSaved(data); setBusy(false)
+function TransactionModal({ user, accounts, initial, onClose, onSaved }) {
+  const isEdit = Boolean(initial?.id)
+  const [type, setType] = useState(initial?.type || 'expense')
+  const [amount, setAmount] = useState(initial ? String(initial.amount) : '')
+  const [category, setCategory] = useState(initial?.category || 'Food')
+  const [description, setDescription] = useState(initial?.description || '')
+  const [accountId, setAccountId] = useState(initial?.account_id || '')
+  const [spentAt, setSpentAt] = useState(initial ? new Date(initial.spent_at).toISOString().slice(0,16) : new Date().toISOString().slice(0,16))
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function save(e) {
+    e.preventDefault(); setBusy(true); setError('')
+    const value = Number(amount)
+    if (!value || value <= 0) { setError('Enter an amount greater than ₹0.'); setBusy(false); return }
+
+    try {
+      const payload = {
+        user_id: user.id, amount: value, type, category,
+        description: description.trim() || null,
+        account_id: accountId || null,
+        spent_at: new Date(spentAt).toISOString(),
+      }
+      if (isEdit) {
+        const { data, error } = await supabase.from('expenses').update(payload).eq('id', initial.id).eq('user_id', user.id).select().single()
+        if (error) throw error
+        await onSaved(data, initial)
+      } else {
+        const { data, error } = await supabase.from('expenses').insert(payload).select().single()
+        if (error) throw error
+        await onSaved(data, null)
+      }
+      onClose()
+    } catch (err) { setError(err.message || 'Unable to save transaction.') }
+    finally { setBusy(false) }
   }
-  return <div className="modal-layer"><div className="modal expense-modal"><div className="modal-header"><div><div className="panel-kicker">POCKET</div><h3>Add expense</h3></div><button className="icon-btn" onClick={onClose}><X size={18}/></button></div>
+
+  return <div className="modal-layer"><div className="modal expense-modal">
+    <div className="modal-header"><div><div className="panel-kicker">POCKET</div><h3>{isEdit ? 'Edit transaction' : 'Add transaction'}</h3></div><button className="icon-btn" onClick={onClose}><X size={18}/></button></div>
+    <div className="segmented"><button className={type==='expense'?'active':''} onClick={()=>setType('expense')} type="button"><TrendingDown size={15}/> Expense</button><button className={type==='income'?'active':''} onClick={()=>setType('income')} type="button"><TrendingUp size={15}/> Income</button></div>
     <form onSubmit={save} className="expense-form"><label className="amount-field"><span>Amount</span><div className="amount-input"><span>₹</span><input inputMode="decimal" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0" autoFocus/></div></label>
-    <div className="form-grid"><label><span>Category</span><select value={category} onChange={e=>setCategory(e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label><label><span>Date & time</span><input type="datetime-local" value={spentAt} onChange={e=>setSpentAt(e.target.value)}/></label></div>
-    <label><span>Description</span><input value={description} onChange={e=>setDescription(e.target.value)} placeholder="What was this for?"/></label>{error&&<div className="form-error">{error}</div>}
-    <div className="modal-actions"><button type="button" className="secondary-btn" onClick={onClose}>Cancel</button><button className="primary-btn" disabled={busy}>{busy?'Saving…':'Save expense'}</button></div></form>
+      <div className="form-grid"><label><span>Category</span><select value={category} onChange={e=>setCategory(e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label><label><span>Account</span><select value={accountId} onChange={e=>setAccountId(e.target.value)}><option value="">No account</option>{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label></div>
+      <div className="form-grid"><label><span>Date & time</span><input type="datetime-local" value={spentAt} onChange={e=>setSpentAt(e.target.value)}/></label><label><span>Description</span><input value={description} onChange={e=>setDescription(e.target.value)} placeholder="What was this for?"/></label></div>
+      {error&&<div className="form-error">{error}</div>}<div className="modal-actions"><button type="button" className="secondary-btn" onClick={onClose}>Cancel</button><button className="primary-btn" disabled={busy}>{busy?'Saving…':isEdit?'Save changes':'Save transaction'}</button></div>
+    </form>
   </div></div>
 }
 
-function Pocket({user,openExpense}){
-  const [expenses,setExpenses]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState('')
-  async function load(){setLoading(true);const {data,error}=await supabase.from('expenses').select('*').eq('type','expense').order('spent_at',{ascending:false}).limit(50);if(error)setError(error.message);else setExpenses(data||[]);setLoading(false)}
-  useEffect(()=>{load()},[])
-  const monthTotal=useMemo(()=>{const now=new Date();return expenses.filter(x=>{const d=new Date(x.spent_at);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear()}).reduce((s,x)=>s+Number(x.amount),0)},[expenses])
-  async function remove(id){const {error}=await supabase.from('expenses').delete().eq('id',id);if(error)setError(error.message);else setExpenses(x=>x.filter(e=>e.id!==id))}
-  return <>
-    <div className="pocket-summary"><div className="summary-main"><span>This month</span><strong>{money(monthTotal)}</strong><small>Tracked expenses in oneVault</small></div><button className="primary-btn" onClick={openExpense}><Plus size={17}/> Add expense</button></div>
-    <section className="panel expense-list-panel"><div className="panel-header"><div><div className="panel-kicker">TRANSACTIONS</div><h3>Recent expenses</h3></div><button className="text-btn" onClick={load}>Refresh</button></div>{error&&<div className="form-error">{error}</div>}
-      {loading?<div className="loading-state">Loading your expenses…</div>:expenses.length===0?<div className="empty-state compact-empty"><div className="empty-icon"><WalletCards size={22}/></div><h4>No expenses yet</h4><p>Add your first transaction and it will sync across devices.</p><button className="primary-btn" onClick={openExpense}><Plus size={16}/> Add expense</button></div>:<div className="expense-list">{expenses.slice(0,8).map(x=><div className="expense-row" key={x.id}><div className="expense-category-icon"><CircleDollarSign size={18}/></div><div className="expense-details"><strong>{x.description||x.category}</strong><span>{x.category} · {new Date(x.spent_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short'})}</span></div><strong className="expense-amount">-{money(x.amount)}</strong><button className="icon-btn danger-btn" onClick={()=>remove(x.id)}><Trash2 size={16}/></button></div>)}</div>}
-    </section>
-  </>
+function AccountModal({ user, initial, onClose, onSaved }) {
+  const [name, setName] = useState(initial?.name || '')
+  const [type, setType] = useState(initial?.type ? initial.type.replace(/(^|\s)\S/g, s=>s.toUpperCase()) : 'Bank')
+  const [balance, setBalance] = useState(initial ? String(initial.balance) : '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  async function save(e) {
+    e.preventDefault(); setBusy(true); setError('')
+    try {
+      const payload = { user_id: user.id, name: name.trim(), type: type.toLowerCase(), balance: Number(balance) || 0 }
+      if (!payload.name) throw new Error('Enter an account name.')
+      const response = initial
+        ? await supabase.from('accounts').update(payload).eq('id', initial.id).eq('user_id', user.id).select().single()
+        : await supabase.from('accounts').insert(payload).select().single()
+      if (response.error) throw response.error
+      onSaved(response.data); onClose()
+    } catch (err) { setError(err.message || 'Unable to save account.') }
+    finally { setBusy(false) }
+  }
+  return <div className="modal-layer"><div className="modal">
+    <div className="modal-header"><div><div className="panel-kicker">POCKET</div><h3>{initial?'Edit account':'Add account'}</h3></div><button className="icon-btn" onClick={onClose}><X size={18}/></button></div>
+    <form onSubmit={save} className="expense-form"><label><span>Name</span><input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. HDFC Bank" autoFocus/></label><div className="form-grid"><label><span>Type</span><select value={type} onChange={e=>setType(e.target.value)}>{accountTypes.map(t=><option key={t}>{t}</option>)}</select></label><label><span>Current balance</span><input inputMode="decimal" value={balance} onChange={e=>setBalance(e.target.value)} placeholder="0"/></label></div>{error&&<div className="form-error">{error}</div>}<div className="modal-actions"><button type="button" className="secondary-btn" onClick={onClose}>Cancel</button><button className="primary-btn" disabled={busy}>{busy?'Saving…':'Save account'}</button></div></form>
+  </div></div>
 }
 
-function App(){
-  const [user,setUser]=useState(null),[authLoading,setAuthLoading]=useState(true),[active,setActive]=useState('pocket'),[mobileOpen,setMobileOpen]=useState(false),[quickAdd,setQuickAdd]=useState(false),[expenseModal,setExpenseModal]=useState(false),[reminderCount,setReminderCount]=useState(0)
-  const activeModule=useMemo(()=>modules.find(m=>m.id===active),[active])
-  useEffect(()=>{let mounted=true;supabase.auth.getSession().then(({data})=>{if(mounted){setUser(data.session?.user||null);setAuthLoading(false)}});const {data:sub}=supabase.auth.onAuthStateChange((_e,session)=>{setUser(session?.user||null);setAuthLoading(false)});return()=>{mounted=false;sub.subscription.unsubscribe()}},[])
-  useEffect(()=>{if(user) supabase.from('reminders').select('id',{count:'exact',head:true}).eq('completed',false).then(({count})=>setReminderCount(count||0))},[user])
-  if(authLoading)return <div className="loading-screen">Loading oneVault…</div>
-  if(!user)return <AuthScreen onSignedIn={setUser}/>
-  async function signOut(){await supabase.auth.signOut();setUser(null)}
+function BudgetModal({ user, initial, onClose, onSaved }) {
+  const [category, setCategory] = useState(initial?.category || 'Food')
+  const [amount, setAmount] = useState(initial ? String(initial.amount) : '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  async function save(e) {
+    e.preventDefault(); setBusy(true); setError('')
+    try {
+      const value = Number(amount)
+      if (!value || value <= 0) throw new Error('Enter a budget greater than ₹0.')
+      const month = `${monthKey(new Date())}-01`
+      const { data, error } = await supabase.from('budgets').upsert({ user_id: user.id, category, amount: value, month }, { onConflict: 'user_id,category,month' }).select().single()
+      if (error) throw error
+      onSaved(data); onClose()
+    } catch (err) { setError(err.message || 'Unable to save budget.') }
+    finally { setBusy(false) }
+  }
+  return <div className="modal-layer"><div className="modal">
+    <div className="modal-header"><div><div className="panel-kicker">POCKET</div><h3>Set monthly budget</h3></div><button className="icon-btn" onClick={onClose}><X size={18}/></button></div>
+    <form onSubmit={save} className="expense-form"><label><span>Category</span><select value={category} onChange={e=>setCategory(e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label><label><span>Budget amount</span><div className="amount-input"><span>₹</span><input inputMode="decimal" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0"/></div></label>{error&&<div className="form-error">{error}</div>}<div className="modal-actions"><button type="button" className="secondary-btn" onClick={onClose}>Cancel</button><button className="primary-btn" disabled={busy}>{busy?'Saving…':'Save budget'}</button></div></form>
+  </div></div>
+}
+
+function Pocket({ user, onQuickAdd }) {
+  const [transactions, setTransactions] = useState([])
+  const [accounts, setAccounts] = useState([])
+  const [budgets, setBudgets] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState('all')
+  const [accountModal, setAccountModal] = useState(null)
+  const [budgetModal, setBudgetModal] = useState(null)
+  const [editing, setEditing] = useState(null)
+
+  async function load() {
+    setLoading(true); setError('')
+    const start = monthStart(-6).toISOString()
+    const [tx, ac, bu] = await Promise.all([
+      supabase.from('expenses').select('*').gte('spent_at', start).order('spent_at', { ascending: false }).limit(500),
+      supabase.from('accounts').select('*').order('created_at', { ascending: true }),
+      supabase.from('budgets').select('*').eq('month', `${monthKey(new Date())}-01`).order('category'),
+    ])
+    if (tx.error || ac.error || bu.error) setError(tx.error?.message || ac.error?.message || bu.error?.message || 'Unable to load Pocket data.')
+    setTransactions(tx.data || []); setAccounts(ac.data || []); setBudgets(bu.data || []); setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  const currentMonth = monthKey(new Date())
+  const current = useMemo(() => transactions.filter(x => monthKey(x.spent_at) === currentMonth), [transactions])
+  const income = useMemo(() => current.filter(x=>x.type==='income').reduce((s,x)=>s+Number(x.amount),0), [current])
+  const expenses = useMemo(() => current.filter(x=>x.type==='expense').reduce((s,x)=>s+Number(x.amount),0), [current])
+  const balance = income - expenses
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return transactions.filter(x => {
+      const matchesType = filter === 'all' || x.type === filter
+      const matchesQuery = !q || `${x.description || ''} ${x.category}`.toLowerCase().includes(q)
+      return matchesType && matchesQuery
+    }).slice(0, 120)
+  }, [transactions, query, filter])
+
+  const categoryTotals = useMemo(() => categories.map(category => ({ category, total: current.filter(x=>x.type==='expense' && x.category===category).reduce((s,x)=>s+Number(x.amount),0) })).filter(x=>x.total>0).sort((a,b)=>b.total-a.total), [current])
+  const maxCategory = Math.max(1, ...categoryTotals.map(x=>x.total))
+  const sixMonths = useMemo(() => Array.from({ length: 6 }, (_, i) => { const d = monthStart(i-5); const key=monthKey(d); return { key, label:d.toLocaleDateString('en-IN',{month:'short'}), total:transactions.filter(x=>x.type==='expense' && monthKey(x.spent_at)===key).reduce((s,x)=>s+Number(x.amount),0) } }), [transactions])
+  const maxSix = Math.max(1, ...sixMonths.map(x=>x.total))
+
+  async function adjustBalance(accountId, delta) {
+    if (!accountId || !delta) return
+    const account = accounts.find(a=>a.id===accountId)
+    if (!account) return
+    const next = Number(account.balance) + delta
+    const { data, error } = await supabase.from('accounts').update({ balance: next }).eq('id', accountId).eq('user_id', user.id).select().single()
+    if (!error && data) setAccounts(items => items.map(a => a.id===data.id ? data : a))
+  }
+
+  async function saveTransaction(next, previous) {
+    if (previous) {
+      const oldDelta = previous.type === 'income' ? -Number(previous.amount) : Number(previous.amount)
+      await adjustBalance(previous.account_id, oldDelta)
+    }
+    const newDelta = next.type === 'income' ? Number(next.amount) : -Number(next.amount)
+    await adjustBalance(next.account_id, newDelta)
+    setTransactions(items => previous ? items.map(t => t.id===next.id ? next : t) : [next, ...items])
+  }
+
+  async function deleteTransaction(tx) {
+    if (!window.confirm(`Delete ${tx.type} of ${money(tx.amount)}?`)) return
+    const { error } = await supabase.from('expenses').delete().eq('id', tx.id).eq('user_id', user.id)
+    if (error) { setError(error.message); return }
+    const restore = tx.type === 'income' ? -Number(tx.amount) : Number(tx.amount)
+    await adjustBalance(tx.account_id, restore)
+    setTransactions(items => items.filter(x=>x.id!==tx.id))
+  }
+
+  async function deleteAccount(account) {
+    if (!window.confirm(`Delete ${account.name}? Transactions will stay but lose their account link.`)) return
+    const { error } = await supabase.from('accounts').delete().eq('id', account.id).eq('user_id', user.id)
+    if (error) setError(error.message); else setAccounts(items => items.filter(x=>x.id!==account.id))
+  }
+
+  async function deleteBudget(id) {
+    const { error } = await supabase.from('budgets').delete().eq('id', id).eq('user_id', user.id)
+    if (error) setError(error.message); else setBudgets(items=>items.filter(x=>x.id!==id))
+  }
+
+  if (loading) return <div className="loading-state pocket-loading">Loading Pocket…</div>
+
+  return <div className="pocket-page">
+    <div className="pocket-toolbar"><div><div className="panel-kicker">POCKET</div><h2>Money, without the mess.</h2><p>Track cash flow, accounts and monthly limits in one view.</p></div><div className="pocket-actions"><button className="secondary-btn" onClick={load}><RefreshCw size={15}/> Refresh</button><button className="secondary-btn" onClick={()=>setAccountModal({})}><CreditCard size={15}/> Account</button><button className="secondary-btn" onClick={()=>setBudgetModal({})}><PiggyBank size={15}/> Budget</button><button className="primary-btn" onClick={()=>onQuickAdd('expense')}><Plus size={16}/> Transaction</button></div></div>
+
+    {error&&<div className="form-error pocket-error">{error}</div>}
+
+    <div className="pocket-kpis"><div className="money-card"><span>Income · {monthLabel(new Date())}</span><strong>{money(income)}</strong><small><TrendingUp size={13}/> Money in</small></div><div className="money-card"><span>Expenses · {monthLabel(new Date())}</span><strong>{money(expenses)}</strong><small><TrendingDown size={13}/> Money out</small></div><div className="money-card"><span>Net this month</span><strong className={balance>=0?'positive':''}>{money(balance)}</strong><small><CircleDollarSign size={13}/> Income minus expenses</small></div><div className="money-card"><span>Accounts</span><strong>{accounts.length}</strong><small><WalletCards size={13}/> Linked accounts</small></div></div>
+
+    <div className="pocket-chart-grid"><section className="panel chart-panel"><div className="panel-header"><div><div className="panel-kicker">SPENDING</div><h3>Last 6 months</h3></div></div><div className="bar-chart">{sixMonths.map(item=><div className="bar-col" key={item.key}><div className="bar-value">{item.total ? money(item.total).replace('₹','₹') : '—'}</div><div className="bar-track"><div className="bar-fill" style={{height:`${Math.max(6,(item.total/maxSix)*100)}%`}}/></div><span>{item.label}</span></div>)}</div></section>
+      <section className="panel chart-panel"><div className="panel-header"><div><div className="panel-kicker">THIS MONTH</div><h3>By category</h3></div></div><div className="category-bars">{categoryTotals.length===0?<div className="small-muted">No expenses recorded this month.</div>:categoryTotals.slice(0,6).map(item=><div className="category-row" key={item.category}><div><span>{item.category}</span><strong>{money(item.total)}</strong></div><div className="category-track"><div className="category-fill" style={{width:`${(item.total/maxCategory)*100}%`}}/></div></div>)}</div></section></div>
+
+    <div className="pocket-columns"><section className="panel transactions-panel"><div className="panel-header"><div><div className="panel-kicker">TRANSACTIONS</div><h3>History</h3></div><span className="results-count">{filtered.length} shown</span></div><div className="transaction-filters"><div className="search-box"><Search size={15}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search description or category"/></div><div className="filter-tabs"><button className={filter==='all'?'active':''} onClick={()=>setFilter('all')}>All</button><button className={filter==='expense'?'active':''} onClick={()=>setFilter('expense')}>Expenses</button><button className={filter==='income'?'active':''} onClick={()=>setFilter('income')}>Income</button></div><Filter size={15} className="filter-icon"/></div>
+      {filtered.length===0?<div className="empty-state compact-empty"><div className="empty-icon"><WalletCards size={22}/></div><h4>No matching transactions</h4><p>Try another search or add a new transaction.</p><button className="primary-btn" onClick={()=>onQuickAdd('expense')}><Plus size={16}/> Add transaction</button></div>:<div className="transaction-table"><div className="tx-head"><span>Transaction</span><span>Account</span><span>Date</span><span>Amount</span><span/></div>{filtered.map(tx=>{const account=accounts.find(a=>a.id===tx.account_id);return <div className="tx-row" key={tx.id}><div className="tx-main"><div className={`tx-icon ${tx.type}`}><CircleDollarSign size={16}/></div><div><strong>{tx.description||tx.category}</strong><small>{tx.category}</small></div></div><span>{account?.name || '—'}</span><span>{new Date(tx.spent_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short'})}</span><strong className={tx.type==='income'?'income-text':'expense-text'}>{tx.type==='income'?'+':'-'}{money(tx.amount)}</strong><div className="row-actions"><button className="icon-btn" onClick={()=>setEditing(tx)}><Edit3 size={14}/></button><button className="icon-btn danger-btn" onClick={()=>deleteTransaction(tx)}><Trash2 size={14}/></button></div></div>})}</div>}
+    </section>
+
+    <aside className="pocket-side"><section className="panel accounts-panel"><div className="panel-header"><div><div className="panel-kicker">ACCOUNTS</div><h3>Your money</h3></div><button className="icon-btn" onClick={()=>setAccountModal({})}><Plus size={16}/></button></div>{accounts.length===0?<div className="side-empty">Add a bank, cash wallet or card.</div>:<div className="account-list">{accounts.map(account=><div className="account-row" key={account.id}><div className="module-icon"><CreditCard size={16}/></div><div><strong>{account.name}</strong><small>{account.type}</small></div><div className="account-right"><strong>{money(account.balance)}</strong><div><button onClick={()=>setAccountModal(account)} className="mini-btn"><Edit3 size={12}/></button><button onClick={()=>deleteAccount(account)} className="mini-btn danger"><Trash2 size={12}/></button></div></div></div>)}</div>}</section>
+      <section className="panel budgets-panel"><div className="panel-header"><div><div className="panel-kicker">BUDGETS</div><h3>This month</h3></div><button className="icon-btn" onClick={()=>setBudgetModal({})}><Plus size={16}/></button></div>{budgets.length===0?<div className="side-empty">Set category limits to keep spending on track.</div>:<div className="budget-list">{budgets.map(b=>{const spent=current.filter(x=>x.type==='expense'&&x.category===b.category).reduce((s,x)=>s+Number(x.amount),0);const pct=Math.min(100,(spent/Number(b.amount))*100);return <div className="budget-row" key={b.id}><div><strong>{b.category}</strong><span>{money(spent)} of {money(b.amount)}</span></div><div className="budget-track"><div className={`budget-fill ${pct>=100?'over':''}`} style={{width:`${pct}%`}}/></div><div className="budget-foot"><small>{Math.round(pct)}% used</small><button className="mini-btn danger" onClick={()=>deleteBudget(b.id)}><Trash2 size={12}/></button></div></div>})}</div>}</section></aside></div>
+
+    {editing&&<TransactionModal user={user} accounts={accounts} initial={editing} onClose={()=>setEditing(null)} onSaved={saveTransaction}/>} {accountModal!==null&&<AccountModal user={user} initial={accountModal?.id?accountModal:null} onClose={()=>setAccountModal(null)} onSaved={data=>setAccounts(items=>accountModal?.id?items.map(a=>a.id===data.id?data:a):[...items,data])}/>} {budgetModal!==null&&<BudgetModal user={user} initial={budgetModal?.id?budgetModal:null} onClose={()=>setBudgetModal(null)} onSaved={data=>setBudgets(items=>{const i=items.findIndex(b=>b.id===data.id);return i>=0?items.map(b=>b.id===data.id?data:b):[...items,data]})}/>} 
+  </div>
+}
+
+function App() {
+  const [user, setUser] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [active, setActive] = useState('pocket')
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [quickAdd, setQuickAdd] = useState(false)
+  const [transactionType, setTransactionType] = useState('expense')
+  const activeModule = useMemo(() => modules.find(m => m.id === active), [active])
+
+  useEffect(() => {
+    let mounted = true
+    supabase.auth.getSession().then(({ data }) => { if (mounted) { setUser(data.session?.user || null); setAuthLoading(false) } })
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => { setUser(session?.user || null); setAuthLoading(false) })
+    return () => { mounted = false; sub.subscription.unsubscribe() }
+  }, [])
+
+  if (authLoading) return <div className="loading-screen">Loading oneVault…</div>
+  if (!user) return <AuthScreen onSignedIn={setUser}/>
+
+  async function signOut() { await supabase.auth.signOut(); setUser(null) }
+  function openTransaction(type = 'expense') { setTransactionType(type); setQuickAdd(false); window.dispatchEvent(new CustomEvent('onevault:open-transaction', { detail: type })) }
+
   return <div className="app-shell"><div className="ambient ambient-one"/><div className="ambient ambient-two"/>
     <aside className={`sidebar ${mobileOpen?'open':''}`}><div className="brand-row"><div className="brand-mark">1</div><div><div className="brand-title">oneVault</div><div className="brand-subtitle">Personal workspace</div></div><button className="icon-btn mobile-close" onClick={()=>setMobileOpen(false)}><X size={18}/></button></div>
       <nav className="module-nav"><div className="nav-label">YOUR SPACE</div>{modules.map(m=>{const Icon=m.icon;return <button key={m.id} className={`module-btn ${active===m.id?'selected':''}`} onClick={()=>{setActive(m.id);setMobileOpen(false)}}><span className="module-icon"><Icon size={19}/></span><span className="module-copy"><strong>{m.label}</strong><small>{m.description}</small></span><ChevronRight size={15} className="module-arrow"/></button>})}</nav>
       <div className="sidebar-footer"><div className="privacy-card"><ShieldCheck size={18}/><div><strong>Private mode</strong><span>Owner-only database access.</span></div></div><button className="logout-btn" onClick={signOut}><LogOut size={16}/> Sign out</button></div>
-    </aside>{mobileOpen&&<button className="backdrop" onClick={()=>setMobileOpen(false)}/>}<main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-btn mobile-menu" onClick={()=>setMobileOpen(true)}><Menu size={20}/></button><div><div className="eyebrow">PRIVATE DASHBOARD</div><h1>{activeModule.label}</h1></div></div><div className="topbar-actions"><button className="icon-btn"><Search size={19}/></button><button className="primary-btn" onClick={()=>active==='pocket'?setExpenseModal(true):setQuickAdd(true)}><Plus size={17}/> Quick add</button></div></header>
+    </aside>
+    {mobileOpen&&<button className="backdrop" onClick={()=>setMobileOpen(false)}/>}<main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-btn mobile-menu" onClick={()=>setMobileOpen(true)}><Menu size={20}/></button><div><div className="eyebrow">PRIVATE DASHBOARD</div><h1>{activeModule.label}</h1></div></div><div className="topbar-actions"><button className="primary-btn" onClick={()=>active==='pocket'?openTransaction('expense'):setQuickAdd(true)}><Plus size={17}/> Quick add</button></div></header>
       <section className="content"><div className="hero-row"><div><span className="pill"><span className="status-dot"/> Private workspace</span><h2>Everything personal,<br/><span>in one place.</span></h2><p>Expenses, reminders, passwords and notes with one clean interface across your devices.</p></div><div className="date-card"><div className="date-label">TODAY</div><div className="date-value">{new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div><div className="date-helper">{user.email}</div></div></div>
-      <div className="stat-grid"><button className="stat-card" onClick={()=>setActive('pocket')}><div className="stat-icon"><WalletCards size={18}/></div><div className="stat-meta"><span>Pocket</span><small>Expense tracker</small></div><strong>Live</strong></button><button className="stat-card" onClick={()=>setActive('reminders')}><div className="stat-icon"><Bell size={18}/></div><div className="stat-meta"><span>Upcoming</span><small>Open reminders</small></div><strong>{reminderCount}</strong></button><button className="stat-card" onClick={()=>setActive('passwords')}><div className="stat-icon"><LockKeyhole size={18}/></div><div className="stat-meta"><span>Vault</span><small>Secure credentials</small></div><strong>Ready</strong></button><button className="stat-card" onClick={()=>setActive('notes')}><div className="stat-icon"><NotebookPen size={18}/></div><div className="stat-meta"><span>Notes</span><small>Personal workspace</small></div><strong>Ready</strong></button></div>
-      {active==='pocket'?<Pocket user={user} openExpense={()=>setExpenseModal(true)}/>:<div className="workspace-grid"><section className="panel large-panel"><div className="panel-header"><div><div className="panel-kicker">MODULE</div><h3>{activeModule.label}</h3></div><button className="text-btn" onClick={()=>setQuickAdd(true)}>Add new <Plus size={15}/></button></div><div className="empty-state"><div className="empty-icon">{(()=>{const Icon=activeModule.icon;return <Icon size={25}/>})()}</div><h4>{activeModule.label} is next</h4><p>The secure backend is ready. We’ll build this module next.</p><button className="primary-btn" onClick={()=>setQuickAdd(true)}><Plus size={16}/> Explore actions</button></div></section><section className="panel security-panel"><div className="panel-kicker">SECURITY FOUNDATION</div><h3>Private by design.</h3><p>Authentication and database access are enforced before sensitive data is connected.</p><div className="security-list"><div><Check size={16}/> Owner-only access</div><div><Check size={16}/> Row-level security</div><div><Check size={16}/> Encrypted password vault</div><div><Check size={16}/> Cross-device sync</div></div></section></div>}
+        {active==='pocket'?<Pocket user={user} onQuickAdd={openTransaction}/>:<div className="workspace-grid"><section className="panel large-panel"><div className="panel-header"><div><div className="panel-kicker">MODULE</div><h3>{activeModule.label}</h3></div><button className="text-btn" onClick={()=>setQuickAdd(true)}>Add new <Plus size={15}/></button></div><div className="empty-state"><div className="empty-icon">{(()=>{const Icon=activeModule.icon;return <Icon size={25}/>})()}</div><h4>{activeModule.label} is next</h4><p>The secure backend is ready. We’ll build this module on the same private foundation.</p><button className="primary-btn" onClick={()=>setQuickAdd(true)}><Plus size={16}/> Explore actions</button></div></section><section className="panel security-panel"><div className="panel-kicker">SECURITY FOUNDATION</div><h3>Private by design.</h3><p>Authentication and database access are enforced before sensitive data is connected.</p><div className="security-list"><div><Check size={16}/> Owner-only access</div><div><Check size={16}/> Row-level security</div><div><Check size={16}/> Encrypted password vault</div><div><Check size={16}/> Cross-device sync</div></div></section></div>}
       </section></main>
-    {quickAdd&&<div className="modal-layer"><div className="modal"><div className="modal-header"><div><div className="panel-kicker">QUICK ADD</div><h3>What do you want to create?</h3></div><button className="icon-btn" onClick={()=>setQuickAdd(false)}><X size={18}/></button></div><div className="quick-grid">{modules.map(m=>{const Icon=m.icon;return <button key={m.id} className="quick-option" onClick={()=>{setActive(m.id);setQuickAdd(false);if(m.id==='pocket')setExpenseModal(true)}}><span className="module-icon"><Icon size={20}/></span><span><strong>{m.label}</strong><small>{m.description}</small></span><ChevronRight size={15}/></button>})}</div></div></div>}
-    {expenseModal&&<ExpenseModal user={user} onClose={()=>setExpenseModal(false)} onSaved={()=>setExpenseModal(false)}/>}</div>
+    {quickAdd&&<div className="modal-layer"><div className="modal"><div className="modal-header"><div><div className="panel-kicker">QUICK ADD</div><h3>What do you want to create?</h3></div><button className="icon-btn" onClick={()=>setQuickAdd(false)}><X size={18}/></button></div><div className="quick-grid">{modules.map(m=>{const Icon=m.icon;return <button key={m.id} className="quick-option" onClick={()=>{setActive(m.id);setQuickAdd(false)}}><span className="module-icon"><Icon size={20}/></span><span><strong>{m.label}</strong><small>{m.description}</small></span><ChevronRight size={15}/></button>})}</div></div></div>}
+  </div>
 }
 export default App
