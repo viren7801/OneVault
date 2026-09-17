@@ -49,11 +49,11 @@ function AuthScreen({ onSignedIn }) {
 function TransactionModal({ user, accounts, initial, onClose, onSaved }) {
   const isEdit = Boolean(initial?.id)
   const [type, setType] = useState(initial?.type || 'expense')
-  const [amount, setAmount] = useState(initial ? String(initial.amount) : '')
+  const [amount, setAmount] = useState(initial?.amount != null ? String(initial.amount) : '')
   const [category, setCategory] = useState(initial?.category || 'Food')
   const [description, setDescription] = useState(initial?.description || '')
   const [accountId, setAccountId] = useState(initial?.account_id || '')
-  const [spentAt, setSpentAt] = useState(initial ? new Date(initial.spent_at).toISOString().slice(0,16) : new Date().toISOString().slice(0,16))
+  const [spentAt, setSpentAt] = useState(initial?.spent_at ? new Date(initial.spent_at).toISOString().slice(0,16) : new Date().toISOString().slice(0,16))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
