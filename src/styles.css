@@ -322,9 +322,9 @@ button { color: inherit; }
 /* Calendar hover preview */
 .calendar-panel{overflow:visible}
 .calendar-day{width:100%;z-index:1}
-.calendar-day.preview-open{z-index:80}
+.calendar-day.preview-open{z-index:999}
 .calendar-day:focus-visible{outline:1px solid rgba(194,187,255,.55);outline-offset:-2px}
-.calendar-preview{position:absolute;left:8px;top:calc(100% + 7px);width:min(250px,calc(100vw - 30px));padding:12px;border:1px solid rgba(255,255,255,.11);border-radius:15px;background:rgba(20,20,24,.96);box-shadow:0 18px 45px rgba(0,0,0,.38),0 0 0 1px rgba(255,255,255,.025);backdrop-filter:blur(22px);text-align:left;z-index:100}
+.calendar-preview{position:absolute;left:8px;top:calc(100% - 1px);width:min(250px,calc(100vw - 30px));padding:12px;border:1px solid rgba(255,255,255,.11);border-radius:15px;background:rgba(20,20,24,.96);box-shadow:0 18px 45px rgba(0,0,0,.38),0 0 0 1px rgba(255,255,255,.025);backdrop-filter:blur(22px);text-align:left;z-index:100}
 .calendar-preview-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:9px;border-bottom:1px solid rgba(255,255,255,.06)}
 .calendar-preview-head strong{font-size:11px;color:#f1f1f3}
 .calendar-preview-head span{font-size:8px;color:#666671}
