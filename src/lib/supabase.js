@@ -11,10 +11,16 @@ if (!supabaseUrl || !supabaseKey) {
   )
 }
 
+const authStorage = typeof window !== 'undefined' ? window.sessionStorage : undefined
+
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+    experimental: {
+      passkey: true,
+    },
+    ...(authStorage ? { storage: authStorage } : {}),
   },
 })
