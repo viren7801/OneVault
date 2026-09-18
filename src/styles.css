@@ -816,3 +816,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .device-security-actions{grid-column:2;justify-content:flex-start}
   .device-name-edit{grid-template-columns:minmax(0,1fr) auto auto}
 }
+
+.security-setting-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 12px;border:1px solid rgba(255,255,255,.06);border-radius:11px;background:rgba(255,255,255,.025)}
+.security-setting-row>div{display:grid;gap:3px;min-width:0}
+.security-setting-row strong{font-size:10px;color:#e7e7ec}
+.security-setting-row span{font-size:8px;color:#6d6d77}
+.security-setting-row select{height:34px;padding:0 10px;border:1px solid rgba(255,255,255,.08);border-radius:9px;color:#dddde3;background:#17171b;outline:none;font-size:9px}
+.security-setting-row select:focus{border-color:rgba(181,170,255,.4)}
+@media (max-width:760px){
+  .security-setting-row{align-items:flex-start;flex-direction:column}
+  .security-setting-row select{width:100%}
+}
