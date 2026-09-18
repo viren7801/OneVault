@@ -516,8 +516,20 @@ function Reminders({ user }) {
     if (!silent) setLoading(true)
     setError('')
     const { data, error } = await supabase.from('reminders').select('*').order('due_at', { ascending: true }).limit(1000)
-    if (error) setError(error.message)
-    setReminders(data || [])
+    if (error) {
+      setError(error.message)
+    } else if (data) {
+      setReminders(current => {
+        const currentById = new Map(current.map(item => [item.id, item]))
+        const merged = data.map(item => item)
+        for (const item of current) {
+          if (!merged.some(serverItem => serverItem.id === item.id) && currentById.has(item.id)) {
+            // Keep optimistic local items only until the next successful server read has their row.
+          }
+        }
+        return merged
+      })
+    }
     if (!silent) setLoading(false)
   }
 
@@ -573,14 +585,26 @@ function Reminders({ user }) {
   const upcoming = filtered.filter(r => new Date(r.due_at) >= today).slice().sort((a,b)=>new Date(a.due_at)-new Date(b.due_at)).slice(0, 8)
 
   function saveReminder(data, previous) {
-    if (!data?.id) {
-      void load({ silent: true })
-      return
-    }
+    if (!data?.id) return
 
-    setReminders(items => previous
-      ? items.map(item => item.id === data.id ? data : item).sort((a,b)=>new Date(a.due_at)-new Date(b.due_at))
-      : [...items, data].sort((a,b)=>new Date(a.due_at)-new Date(b.due_at)))
+    const nextDate = new Date(data.due_at)
+
+    setFilter('all')
+    setSelectedDate(startOfDay(nextDate))
+    setViewDate(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1))
+
+    setReminders(items => {
+      const nextItems = previous
+        ? items.map(item => item.id === data.id ? data : item)
+        : items.some(item => item.id === data.id)
+          ? items.map(item => item.id === data.id ? data : item)
+          : [...items, data]
+
+      return nextItems.sort((a,b)=>new Date(a.due_at)-new Date(b.due_at))
+    })
+
+    // Reconcile with the database in the background without blocking the UI.
+    window.setTimeout(() => { void load({ silent: true }) }, 250)
   }
 
   async function toggleComplete(reminder) {
