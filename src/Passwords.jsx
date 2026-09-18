@@ -44,7 +44,7 @@ export default function Passwords({user}){
   const keyRef=useRef(null),[query,setQuery]=useState(''),[category,setCategory]=useState('all'),[selectedId,setSelectedId]=useState(null)
   const [form,setForm]=useState(blankForm),[editing,setEditing]=useState(null),[showForm,setShowForm]=useState(false),[showSecret,setShowSecret]=useState(false)
   const [showChange,setShowChange]=useState(false),[newMaster,setNewMaster]=useState(''),[newMasterConfirm,setNewMasterConfirm]=useState(''),[copied,setCopied]=useState('')
-  const [biometricAvailable,setBiometricAvailable]=useState(false),[biometricBusy,setBiometricBusy]=useState(false)
+  const [biometricAvailable,setBiometricAvailable]=useState(false),[biometricBusy,setBiometricBusy]=useState(false),[biometricRepair,setBiometricRepair]=useState(false)
   const masterRef=useRef('')
 
   async function load(){
@@ -99,18 +99,22 @@ export default function Passwords({user}){
     try{
       const password=await unlockWithDevice({credential_id:meta.biometric_credential_id,prf_salt:meta.biometric_prf_salt,iv:meta.biometric_iv,ciphertext:meta.biometric_ciphertext})
       await unlockFromMaster(password)
-    }catch(err){setError(err.message||'Device unlock failed.')}finally{setBiometricBusy(false)}
+    }catch(err){
+      setBiometricRepair(true)
+      setError('This vault device credential is not available on this production domain. Unlock with your vault password, then re-register Touch ID.')
+    }finally{setBiometricBusy(false)}
   }
-  async function enableBiometric(){
+  async function registerBiometric(){
     if(!masterRef.current)return setError('Unlock the vault with your password first.')
     setError('');setBiometricBusy(true)
     try{
       const wrapped=await registerDeviceUnlock(masterRef.current,user.email||'oneVault')
       const row={...meta,biometric_credential_id:wrapped.credential_id,biometric_prf_salt:wrapped.prf_salt,biometric_iv:wrapped.iv,biometric_ciphertext:wrapped.ciphertext,updated_at:new Date().toISOString()}
       const {error:e}=await supabase.from('password_vaults').upsert(row);if(e)throw e
-      setMeta(row)
-    }catch(err){setError(err.message||'Could not enable device unlock.')}finally{setBiometricBusy(false)}
+      setMeta(row);setBiometricRepair(false);setError('')
+    }catch(err){setError(err.message||'Could not register device unlock.')}finally{setBiometricBusy(false)}
   }
+  async function enableBiometric(){ return registerBiometric() }
   async function disableBiometric(){
     setError('');setBiometricBusy(true)
     try{
@@ -179,7 +183,7 @@ export default function Passwords({user}){
   }
 
   return <div className="passwords-page">
-    <div className="module-toolbar"><div><div className="panel-kicker">SECURE VAULT</div><h2>Password manager.</h2><p>{entries.length} encrypted entries · synced across devices.</p></div><div className="module-toolbar-actions"><button className="secondary-btn" onClick={exportBackup}><span className="text-icon">↓</span> Backup</button><button className="secondary-btn" onClick={()=>setShowChange(true)}><KeyRound size={14}/> Change password</button>{meta?.biometric_credential_id?<button className="secondary-btn" onClick={()=>void disableBiometric()} disabled={biometricBusy}><Fingerprint size={14}/> {biometricBusy?'Updating…':'Device unlock on'}</button>:biometricAvailable?<button className="secondary-btn" onClick={()=>void enableBiometric()} disabled={biometricBusy}><Fingerprint size={14}/> {biometricBusy?'Enabling…':'Enable device unlock'}</button>:null}<button className="secondary-btn" onClick={lockVault}><Lock size={14}/> Lock</button><button className="primary-btn" onClick={openNew}><Plus size={15}/> Add password</button></div></div>
+    <div className="module-toolbar"><div><div className="panel-kicker">SECURE VAULT</div><h2>Password manager.</h2><p>{entries.length} encrypted entries · synced across devices.</p></div><div className="module-toolbar-actions"><button className="secondary-btn" onClick={exportBackup}><span className="text-icon">↓</span> Backup</button><button className="secondary-btn" onClick={()=>setShowChange(true)}><KeyRound size={14}/> Change password</button>{meta?.biometric_credential_id?<><button className="secondary-btn" onClick={()=>void disableBiometric()} disabled={biometricBusy}><Fingerprint size={14}/> {biometricBusy?'Updating…':'Device unlock on'}</button>{biometricRepair&&masterRef.current?<button className="secondary-btn" onClick={()=>void registerBiometric()} disabled={biometricBusy}><Fingerprint size={14}/> Re-register device</button>:null}</>:biometricAvailable?<button className="secondary-btn" onClick={()=>void enableBiometric()} disabled={biometricBusy}><Fingerprint size={14}/> {biometricBusy?'Enabling…':'Enable device unlock'}</button>:null}<button className="secondary-btn" onClick={lockVault}><Lock size={14}/> Lock</button><button className="primary-btn" onClick={openNew}><Plus size={15}/> Add password</button></div></div>
     {error&&<div className="form-error">{error}</div>}
     <div className="passwords-toolbar panel"><div className="search-box"><Search size={15}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search website, username or category"/></div><div className="password-category-tabs">{['all',...CATEGORIES].map(item=><button key={item} className={category===item?'active':''} onClick={()=>setCategory(item)}>{item==='all'?'All':item}</button>)}</div></div>
     <div className="passwords-layout">
