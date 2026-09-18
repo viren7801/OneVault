@@ -4,7 +4,7 @@ import postgres from "npm:postgres@3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-onevault-cron-secret, x-telegram-bot-api-secret-token",
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-onevault-cron-secret, x-telegram-bot-api-secret-token",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -356,11 +356,23 @@ async function worker(req) {
   return json({ ok: true, checked: (due.data || []).length, sent, failed });
 }
 
+async function getAction(req) {
+  const url = new URL(req.url);
+  const queryAction = url.searchParams.get("action");
+  if (queryAction) return queryAction;
+
+  if (req.method !== "GET") {
+    const body = await req.clone().json().catch(function() { return {}; });
+    return body && typeof body.action === "string" ? body.action : "";
+  }
+
+  return "";
+}
+
 Deno.serve(async function(req) {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  const url = new URL(req.url);
-  const action = url.searchParams.get("action") || "";
+  const action = await getAction(req);
 
   try {
     if (action === "webhook") return await webhook(req);
