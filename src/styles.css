@@ -723,3 +723,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 .workspace-loading{min-height:320px;display:grid;place-items:center;color:#777781;font-size:12px}
 .quick-add-modal{width:min(620px,100%)}
+
+.vault-gate{width:min(620px,100%);margin:22px auto 0;padding:30px}
+.vault-gate-icon{width:52px;height:52px}
+.device-unlock-btn{width:100%;min-height:44px;display:flex;align-items:center;justify-content:center;gap:9px;border:1px solid rgba(181,170,255,.22);border-radius:12px;background:rgba(112,71,255,.11);color:#e9e7ff;font-size:11px;font-weight:700;cursor:pointer;transition:transform .16s ease,background .16s ease,border-color .16s ease}
+.device-unlock-btn:hover{transform:translateY(-1px);background:rgba(112,71,255,.16);border-color:rgba(181,170,255,.38)}
+.device-unlock-btn:disabled{opacity:.6;cursor:wait;transform:none}
+.vault-divider{display:flex;align-items:center;gap:10px;margin:15px 0;color:#65656f;font-size:8px;text-transform:uppercase;letter-spacing:.11em}
+.vault-divider::before,.vault-divider::after{content:"";height:1px;flex:1;background:rgba(255,255,255,.06)}
