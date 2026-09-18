@@ -254,6 +254,279 @@ function Pocket({ user, onQuickAdd }) {
   </div>
 }
 
+
+const reminderPriorities = ['low', 'medium', 'high']
+const reminderRepeats = [
+  { value: '', label: 'Does not repeat' },
+  { value: 'daily', label: 'Every day' },
+  { value: 'weekly', label: 'Every week' },
+  { value: 'monthly', label: 'Every month' },
+  { value: 'yearly', label: 'Every year' },
+]
+const toDateTimeLocal = (value) => {
+  const d = value ? new Date(value) : new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+const reminderDateKey = (value) => {
+  const d = new Date(value)
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+const startOfDay = (value = new Date()) => {
+  const d = new Date(value)
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+}
+const sameCalendarDay = (a, b) => reminderDateKey(a) === reminderDateKey(b)
+const nextReminderDate = (value, rule) => {
+  const d = new Date(value)
+  if (rule === 'daily') d.setDate(d.getDate() + 1)
+  if (rule === 'weekly') d.setDate(d.getDate() + 7)
+  if (rule === 'monthly') d.setMonth(d.getMonth() + 1)
+  if (rule === 'yearly') d.setFullYear(d.getFullYear() + 1)
+  return d
+}
+const formatReminderTime = (value) => new Date(value).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
+const formatReminderDate = (value) => new Date(value).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
+
+function ReminderModal({ user, initial, onClose, onSaved }) {
+  const isEdit = Boolean(initial?.id)
+  const [title, setTitle] = useState(initial?.title || '')
+  const [description, setDescription] = useState(initial?.description || '')
+  const [dueAt, setDueAt] = useState(toDateTimeLocal(initial?.due_at))
+  const [priority, setPriority] = useState(initial?.priority || 'medium')
+  const [repeatRule, setRepeatRule] = useState(initial?.repeat_rule || '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function save(e) {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      if (!title.trim()) throw new Error('Enter a reminder title.')
+      const due = new Date(dueAt)
+      if (Number.isNaN(due.getTime())) throw new Error('Choose a valid date and time.')
+      const payload = {
+        user_id: user.id,
+        title: title.trim(),
+        description: description.trim() || null,
+        due_at: due.toISOString(),
+        repeat_rule: repeatRule || null,
+        priority,
+        completed: initial?.completed || false,
+      }
+      const response = isEdit
+        ? await supabase.from('reminders').update(payload).eq('id', initial.id).eq('user_id', user.id).select().single()
+        : await supabase.from('reminders').insert(payload).select().single()
+      if (response.error) throw response.error
+      await onSaved(response.data, initial || null)
+      onClose()
+    } catch (err) {
+      setError(err.message || 'Unable to save reminder.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return <div className="modal-layer"><div className="modal reminder-modal">
+    <div className="modal-header">
+      <div><div className="panel-kicker">REMINDERS</div><h3>{isEdit ? 'Edit reminder' : 'New reminder'}</h3></div>
+      <button className="icon-btn" onClick={onClose}><X size={18}/></button>
+    </div>
+    <form onSubmit={save} className="expense-form">
+      <label><span>Title</span><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="What do you need to remember?" autoFocus /></label>
+      <label><span>Description</span><textarea value={description} onChange={e=>setDescription(e.target.value)} placeholder="Add some context…" rows="3" /></label>
+      <div className="form-grid">
+        <label><span>Date & time</span><input type="datetime-local" value={dueAt} onChange={e=>setDueAt(e.target.value)} /></label>
+        <label><span>Priority</span><select value={priority} onChange={e=>setPriority(e.target.value)}>{reminderPriorities.map(item=><option key={item} value={item}>{item[0].toUpperCase()+item.slice(1)}</option>)}</select></label>
+      </div>
+      <label><span>Repeat</span><select value={repeatRule} onChange={e=>setRepeatRule(e.target.value)}>{reminderRepeats.map(item=><option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+      {error&&<div className="form-error">{error}</div>}
+      <div className="modal-actions"><button type="button" className="secondary-btn" onClick={onClose}>Cancel</button><button className="primary-btn" disabled={busy}>{busy?'Saving…':isEdit?'Save changes':'Create reminder'}</button></div>
+    </form>
+  </div></div>
+}
+
+function Reminders({ user }) {
+  const [reminders, setReminders] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState('all')
+  const [viewDate, setViewDate] = useState(startOfDay(new Date()))
+  const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()))
+  const [modal, setModal] = useState(null)
+
+  async function load() {
+    setLoading(true)
+    setError('')
+    const { data, error } = await supabase.from('reminders').select('*').order('due_at', { ascending: true }).limit(1000)
+    if (error) setError(error.message)
+    setReminders(data || [])
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+  useEffect(() => {
+    function handleOpen() { setModal({}) }
+    window.addEventListener('onevault:open-reminder', handleOpen)
+    return () => window.removeEventListener('onevault:open-reminder', handleOpen)
+  }, [])
+
+  const today = startOfDay(new Date())
+  const pendingCount = reminders.filter(r => !r.completed).length
+  const todayCount = reminders.filter(r => !r.completed && sameCalendarDay(r.due_at, today)).length
+  const overdueCount = reminders.filter(r => !r.completed && new Date(r.due_at) < new Date()).length
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return reminders.filter(r => {
+      const matchesQuery = !q || `${r.title} ${r.description || ''}`.toLowerCase().includes(q)
+      const matchesFilter =
+        filter === 'all' ||
+        (filter === 'pending' && !r.completed) ||
+        (filter === 'completed' && r.completed) ||
+        (filter === 'today' && !r.completed && sameCalendarDay(r.due_at, today)) ||
+        (filter === 'overdue' && !r.completed && new Date(r.due_at) < new Date())
+      return matchesQuery && matchesFilter
+    })
+  }, [reminders, query, filter])
+
+  const monthStartDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1)
+  const firstCalendarDay = new Date(monthStartDate)
+  firstCalendarDay.setDate(1 - monthStartDate.getDay())
+  const calendarDays = Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(firstCalendarDay)
+    d.setDate(firstCalendarDay.getDate() + i)
+    return d
+  })
+  const selectedItems = filtered.filter(r => sameCalendarDay(r.due_at, selectedDate)).sort((a,b)=>new Date(a.due_at)-new Date(b.due_at))
+  const upcoming = filtered.filter(r => new Date(r.due_at) >= today).slice().sort((a,b)=>new Date(a.due_at)-new Date(b.due_at)).slice(0, 8)
+
+  function saveReminder(data, previous) {
+    setReminders(items => previous
+      ? items.map(item => item.id === data.id ? data : item).sort((a,b)=>new Date(a.due_at)-new Date(b.due_at))
+      : [...items, data].sort((a,b)=>new Date(a.due_at)-new Date(b.due_at)))
+  }
+
+  async function toggleComplete(reminder) {
+    try {
+      const nextCompleted = !reminder.completed
+      const { data, error } = await supabase.from('reminders').update({ completed: nextCompleted }).eq('id', reminder.id).eq('user_id', user.id).select().single()
+      if (error) throw error
+
+      if (nextCompleted && reminder.repeat_rule) {
+        const nextDue = nextReminderDate(reminder.due_at, reminder.repeat_rule)
+        const { data: nextReminder, error: nextError } = await supabase.from('reminders').insert({
+          user_id: user.id,
+          title: reminder.title,
+          description: reminder.description,
+          due_at: nextDue.toISOString(),
+          repeat_rule: reminder.repeat_rule,
+          priority: reminder.priority,
+          completed: false,
+        }).select().single()
+        if (nextError) throw nextError
+        setReminders(items => [nextReminder, ...items.map(item => item.id === reminder.id ? data : item)].sort((a,b)=>new Date(a.due_at)-new Date(b.due_at)))
+      } else {
+        setReminders(items => items.map(item => item.id === reminder.id ? data : item))
+      }
+    } catch (err) { setError(err.message || 'Unable to update reminder.') }
+  }
+
+  async function snooze(reminder, minutes) {
+    try {
+      const due = new Date(reminder.due_at)
+      due.setMinutes(due.getMinutes() + minutes)
+      const { data, error } = await supabase.from('reminders').update({ due_at: due.toISOString(), completed: false }).eq('id', reminder.id).eq('user_id', user.id).select().single()
+      if (error) throw error
+      setReminders(items => items.map(item => item.id === reminder.id ? data : item))
+    } catch (err) { setError(err.message || 'Unable to snooze reminder.') }
+  }
+
+  async function deleteReminder(reminder) {
+    if (!window.confirm('Delete “' + reminder.title + '”?')) return
+    const { error } = await supabase.from('reminders').delete().eq('id', reminder.id).eq('user_id', user.id)
+    if (error) { setError(error.message); return }
+    setReminders(items => items.filter(item => item.id !== reminder.id))
+    if (modal?.id === reminder.id) setModal(null)
+  }
+
+  function shiftMonth(offset) {
+    setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + offset, 1))
+  }
+
+  if (loading) return <div className="loading-state reminders-loading">Loading reminders…</div>
+
+  return <div className="reminders-page">
+    <div className="reminders-toolbar">
+      <div><div className="panel-kicker">REMINDERS</div><h2>Everything you don't want to forget.</h2><p>Plan your day, schedule repeats and keep the important things visible.</p></div>
+      <div className="reminders-actions"><button className="secondary-btn" onClick={load}><RefreshCw size={15}/> Refresh</button><button className="primary-btn" onClick={()=>setModal({})}><Plus size={16}/> New reminder</button></div>
+    </div>
+    {error&&<div className="form-error pocket-error">{error}</div>}
+    <div className="reminder-kpis">
+      <button className={`reminder-stat ${filter==='pending'?'active':''}`} onClick={()=>setFilter('pending')}><strong>{pendingCount}</strong><span>Pending</span></button>
+      <button className={`reminder-stat ${filter==='today'?'active':''}`} onClick={()=>setFilter('today')}><strong>{todayCount}</strong><span>Today</span></button>
+      <button className={`reminder-stat ${filter==='overdue'?'active':''}`} onClick={()=>setFilter('overdue')}><strong>{overdueCount}</strong><span>Overdue</span></button>
+      <button className={`reminder-stat ${filter==='completed'?'active':''}`} onClick={()=>setFilter('completed')}><strong>{reminders.filter(r=>r.completed).length}</strong><span>Completed</span></button>
+    </div>
+    <div className="reminders-layout">
+      <section className="panel calendar-panel">
+        <div className="panel-header">
+          <div><div className="panel-kicker">CALENDAR</div><h3>{viewDate.toLocaleDateString('en-IN',{month:'long',year:'numeric'})}</h3></div>
+          <div className="calendar-nav"><button className="icon-btn" onClick={()=>shiftMonth(-1)}><ChevronRight size={16} className="rotate-180"/></button><button className="icon-btn" onClick={()=>setViewDate(startOfDay(new Date()))}>Today</button><button className="icon-btn" onClick={()=>shiftMonth(1)}><ChevronRight size={16}/></button></div>
+        </div>
+        <div className="reminder-search"><div className="search-box"><Search size={15}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search reminders"/></div><div className="filter-tabs"><button className={filter==='all'?'active':''} onClick={()=>setFilter('all')}>All</button><button className={filter==='pending'?'active':''} onClick={()=>setFilter('pending')}>Open</button><button className={filter==='completed'?'active':''} onClick={()=>setFilter('completed')}>Done</button></div></div>
+        <div className="calendar-grid calendar-weekdays">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=><span key={d}>{d}</span>)}</div>
+        <div className="calendar-grid">
+          {calendarDays.map(day => {
+            const dayItems = filtered.filter(r => sameCalendarDay(r.due_at, day))
+            const inMonth = day.getMonth() === viewDate.getMonth()
+            const selected = sameCalendarDay(day, selectedDate)
+            return <button key={day.toISOString()} className={`calendar-day ${inMonth?'':'muted'} ${sameCalendarDay(day,today)?'today':''} ${selected?'selected':''}`} onClick={()=>setSelectedDate(startOfDay(day))}>
+              <span className="calendar-number">{day.getDate()}</span>
+              {dayItems.length>0&&<div className="calendar-dots">{dayItems.slice(0,3).map(item=><i key={item.id} className={`priority-dot ${item.priority||'medium'} ${item.completed?'done':''}`}/>)}{dayItems.length>3&&<b>+{dayItems.length-3}</b>}</div>}
+            </button>
+          })}
+        </div>
+      </section>
+      <aside className="reminders-side">
+        <section className="panel agenda-panel">
+          <div className="panel-header"><div><div className="panel-kicker">AGENDA</div><h3>{selectedDate.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'short'})}</h3></div><span className="results-count">{selectedItems.length}</span></div>
+          <div className="reminder-list">
+            {selectedItems.length===0?<div className="side-empty">Nothing scheduled for this day.</div>:selectedItems.map(reminder=><ReminderRow key={reminder.id} reminder={reminder} onEdit={()=>setModal(reminder)} onDelete={()=>deleteReminder(reminder)} onToggle={()=>toggleComplete(reminder)} onSnooze={snooze}/>)}
+          </div>
+        </section>
+        <section className="panel agenda-panel">
+          <div className="panel-header"><div><div className="panel-kicker">UP NEXT</div><h3>Coming up</h3></div></div>
+          <div className="reminder-list">
+            {upcoming.length===0?<div className="side-empty">No upcoming reminders.</div>:upcoming.map(reminder=><ReminderRow key={reminder.id} reminder={reminder} compact onEdit={()=>setModal(reminder)} onDelete={()=>deleteReminder(reminder)} onToggle={()=>toggleComplete(reminder)} onSnooze={snooze}/>)}
+          </div>
+        </section>
+      </aside>
+    </div>
+    {modal&&<ReminderModal user={user} initial={modal} onClose={()=>setModal(null)} onSaved={saveReminder}/>}
+  </div>
+}
+
+function ReminderRow({ reminder, compact = false, onEdit, onDelete, onToggle, onSnooze }) {
+  const overdue = !reminder.completed && new Date(reminder.due_at) < new Date()
+  return <div className={`reminder-row ${reminder.completed?'completed':''} ${compact?'compact':''}`}>
+    <button className={`check-reminder ${reminder.completed?'checked':''}`} onClick={onToggle} title={reminder.completed?'Mark open':'Mark complete'}>{reminder.completed?<Check size={14}/>:null}</button>
+    <div className="reminder-main">
+      <strong>{reminder.title}</strong>
+      {reminder.description&&<small>{reminder.description}</small>}
+      <div className="reminder-meta"><span className={`priority-pill ${reminder.priority||'medium'}`}>{reminder.priority||'medium'}</span>{reminder.repeat_rule&&<span>{reminder.repeat_rule}</span>}<span className={overdue?'overdue-text':''}>{formatReminderDate(reminder.due_at)} · {formatReminderTime(reminder.due_at)}</span></div>
+    </div>
+    <div className="reminder-actions">
+      {!reminder.completed&&<button className="mini-btn" onClick={()=>onSnooze(reminder,15)} title="Snooze 15 min">+15</button>}
+      <button className="mini-btn" onClick={onEdit} title="Edit"><Edit3 size={12}/></button>
+      <button className="mini-btn danger" onClick={onDelete} title="Delete"><Trash2 size={12}/></button>
+    </div>
+  </div>
+}
+
+
 function App() {
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
@@ -275,15 +548,16 @@ function App() {
 
   async function signOut() { await supabase.auth.signOut(); setUser(null) }
   function openTransaction(type = 'expense') { setTransactionType(type); setQuickAdd(false); window.dispatchEvent(new CustomEvent('onevault:open-transaction', { detail: type })) }
+  function openReminder() { setQuickAdd(false); window.dispatchEvent(new CustomEvent('onevault:open-reminder')) }
 
   return <div className="app-shell"><div className="ambient ambient-one"/><div className="ambient ambient-two"/>
     <aside className={`sidebar ${mobileOpen?'open':''}`}><div className="brand-row"><div className="brand-mark">1</div><div><div className="brand-title">oneVault</div><div className="brand-subtitle">Personal workspace</div></div><button className="icon-btn mobile-close" onClick={()=>setMobileOpen(false)}><X size={18}/></button></div>
       <nav className="module-nav"><div className="nav-label">YOUR SPACE</div>{modules.map(m=>{const Icon=m.icon;return <button key={m.id} className={`module-btn ${active===m.id?'selected':''}`} onClick={()=>{setActive(m.id);setMobileOpen(false)}}><span className="module-icon"><Icon size={19}/></span><span className="module-copy"><strong>{m.label}</strong><small>{m.description}</small></span><ChevronRight size={15} className="module-arrow"/></button>})}</nav>
       <div className="sidebar-footer"><div className="privacy-card"><ShieldCheck size={18}/><div><strong>Private mode</strong><span>Owner-only database access.</span></div></div><button className="logout-btn" onClick={signOut}><LogOut size={16}/> Sign out</button></div>
     </aside>
-    {mobileOpen&&<button className="backdrop" onClick={()=>setMobileOpen(false)}/>}<main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-btn mobile-menu" onClick={()=>setMobileOpen(true)}><Menu size={20}/></button><div><div className="eyebrow">PRIVATE DASHBOARD</div><h1>{activeModule.label}</h1></div></div><div className="topbar-actions"><button className="primary-btn" onClick={()=>active==='pocket'?openTransaction('expense'):setQuickAdd(true)}><Plus size={17}/> Quick add</button></div></header>
+    {mobileOpen&&<button className="backdrop" onClick={()=>setMobileOpen(false)}/>}<main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-btn mobile-menu" onClick={()=>setMobileOpen(true)}><Menu size={20}/></button><div><div className="eyebrow">PRIVATE DASHBOARD</div><h1>{activeModule.label}</h1></div></div><div className="topbar-actions"><button className="primary-btn" onClick={()=>active==='pocket'?openTransaction('expense'):active==='reminders'?openReminder():setQuickAdd(true)}><Plus size={17}/> Quick add</button></div></header>
       <section className="content"><div className="hero-row"><div><span className="pill"><span className="status-dot"/> Private workspace</span><h2>Everything personal,<br/><span>in one place.</span></h2><p>Expenses, reminders, passwords and notes with one clean interface across your devices.</p></div><div className="date-card"><div className="date-label">TODAY</div><div className="date-value">{new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div><div className="date-helper">{user.email}</div></div></div>
-        {active==='pocket'?<Pocket user={user} onQuickAdd={openTransaction}/>:<div className="workspace-grid"><section className="panel large-panel"><div className="panel-header"><div><div className="panel-kicker">MODULE</div><h3>{activeModule.label}</h3></div><button className="text-btn" onClick={()=>setQuickAdd(true)}>Add new <Plus size={15}/></button></div><div className="empty-state"><div className="empty-icon">{(()=>{const Icon=activeModule.icon;return <Icon size={25}/>})()}</div><h4>{activeModule.label} is next</h4><p>The secure backend is ready. We’ll build this module on the same private foundation.</p><button className="primary-btn" onClick={()=>setQuickAdd(true)}><Plus size={16}/> Explore actions</button></div></section><section className="panel security-panel"><div className="panel-kicker">SECURITY FOUNDATION</div><h3>Private by design.</h3><p>Authentication and database access are enforced before sensitive data is connected.</p><div className="security-list"><div><Check size={16}/> Owner-only access</div><div><Check size={16}/> Row-level security</div><div><Check size={16}/> Encrypted password vault</div><div><Check size={16}/> Cross-device sync</div></div></section></div>}
+        {active==='pocket'?<Pocket user={user} onQuickAdd={openTransaction}/>:active==='reminders'?<Reminders user={user}/>:<div className="workspace-grid"><section className="panel large-panel"><div className="panel-header"><div><div className="panel-kicker">MODULE</div><h3>{activeModule.label}</h3></div><button className="text-btn" onClick={()=>setQuickAdd(true)}>Add new <Plus size={15}/></button></div><div className="empty-state"><div className="empty-icon">{(()=>{const Icon=activeModule.icon;return <Icon size={25}/>})()}</div><h4>{activeModule.label} is next</h4><p>The secure backend is ready. We’ll build this module on the same private foundation.</p><button className="primary-btn" onClick={()=>setQuickAdd(true)}><Plus size={16}/> Explore actions</button></div></section><section className="panel security-panel"><div className="panel-kicker">SECURITY FOUNDATION</div><h3>Private by design.</h3><p>Authentication and database access are enforced before sensitive data is connected.</p><div className="security-list"><div><Check size={16}/> Owner-only access</div><div><Check size={16}/> Row-level security</div><div><Check size={16}/> Encrypted password vault</div><div><Check size={16}/> Cross-device sync</div></div></section></div>}
       </section></main>
     {quickAdd&&<div className="modal-layer"><div className="modal"><div className="modal-header"><div><div className="panel-kicker">QUICK ADD</div><h3>What do you want to create?</h3></div><button className="icon-btn" onClick={()=>setQuickAdd(false)}><X size={18}/></button></div><div className="quick-grid">{modules.map(m=>{const Icon=m.icon;return <button key={m.id} className="quick-option" onClick={()=>{setActive(m.id);setQuickAdd(false)}}><span className="module-icon"><Icon size={20}/></span><span><strong>{m.label}</strong><small>{m.description}</small></span><ChevronRight size={15}/></button>})}</div></div></div>}
   </div>
