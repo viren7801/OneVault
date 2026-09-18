@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Check, Fingerprint, KeyRound, Pencil, ShieldCheck, Trash2, X } from 'lucide-react'
+import { Check, Fingerprint, KeyRound, Lock, Pencil, ShieldCheck, Trash2, X } from 'lucide-react'
 import { supabase } from './lib/supabase'
 
 function deviceHint(name = '') {
