@@ -836,7 +836,18 @@ function App() {
   const [quickAdd, setQuickAdd] = useState(false)
   const [transactionType, setTransactionType] = useState('expense')
   const [showPasskeyManager, setShowPasskeyManager] = useState(false)
+  const [autoLockMinutes, setAutoLockMinutes] = useState(() => {
+    const stored = Number(window.localStorage.getItem('onevault:autoLockMinutes'))
+    return Number.isFinite(stored) && stored >= 0 ? stored : 15
+  })
+  const lastActivityRef = useRef(Date.now())
   const activeModule = useMemo(() => modules.find(m => m.id === active), [active])
+
+  async function signOut() {
+    await supabase.auth.signOut({ scope: 'local' })
+    setUser(null)
+    setShowPasskeyManager(false)
+  }
 
   useEffect(() => {
     let mounted = true
@@ -844,6 +855,29 @@ function App() {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => { setUser(session?.user || null); setAuthLoading(false) })
     return () => { mounted = false; sub.subscription.unsubscribe() }
   }, [])
+
+  useEffect(() => {
+    if (!user) return undefined
+    lastActivityRef.current = Date.now()
+    const markActivity = () => { lastActivityRef.current = Date.now() }
+    const events = ['pointerdown', 'keydown', 'touchstart', 'mousemove']
+    events.forEach(event => window.addEventListener(event, markActivity, { passive: true }))
+    const interval = window.setInterval(() => {
+      if (!autoLockMinutes) return
+      if (Date.now() - lastActivityRef.current >= autoLockMinutes * 60 * 1000) {
+        void signOut()
+      }
+    }, 15000)
+    return () => {
+      events.forEach(event => window.removeEventListener(event, markActivity))
+      window.clearInterval(interval)
+    }
+  }, [user, autoLockMinutes])
+
+  useEffect(() => {
+    if (!user) return
+    window.localStorage.setItem('onevault:autoLockMinutes', String(autoLockMinutes))
+  }, [autoLockMinutes, user])
 
   if (authLoading) return <div className="loading-screen">Loading oneVault…</div>
 
@@ -862,7 +896,6 @@ function App() {
 
   if (!user) return <AuthScreen onSignedIn={handleSignedIn}/>
 
-  async function signOut() { await supabase.auth.signOut({ scope: 'local' }); setUser(null) }
   function openTransaction(type = 'expense') { setTransactionType(type); setQuickAdd(false); window.dispatchEvent(new CustomEvent('onevault:open-transaction', { detail: type })) }
   function openReminder() { setQuickAdd(false); window.dispatchEvent(new CustomEvent('onevault:open-reminder')) }
   function openPassword() { setQuickAdd(false); window.dispatchEvent(new CustomEvent('onevault:open-password')) }
@@ -880,14 +913,21 @@ function App() {
   return <div className="app-shell"><div className="ambient ambient-one"/><div className="ambient ambient-two"/>
     <aside className={`sidebar ${mobileOpen?'open':''}`}><div className="brand-row"><div className="brand-mark">1</div><div><div className="brand-title">oneVault</div><div className="brand-subtitle">Personal workspace</div></div><button className="icon-btn mobile-close" onClick={()=>setMobileOpen(false)}><X size={18}/></button></div>
       <nav className="module-nav"><div className="nav-label">YOUR SPACE</div>{modules.map(m=>{const Icon=m.icon;return <button key={m.id} className={`module-btn ${active===m.id?'selected':''}`} onClick={()=>{setActive(m.id);setMobileOpen(false)}}><span className="module-icon"><Icon size={19}/></span><span className="module-copy"><strong>{m.label}</strong><small>{m.description}</small></span><ChevronRight size={15} className="module-arrow"/></button>})}</nav>
-      <div className="sidebar-footer"><div className="privacy-card"><ShieldCheck size={18}/><div><strong>Private mode</strong><span>Owner-only database access.</span></div></div><button className="device-security-btn" onClick={()=>setShowPasskeyManager(true)}><Fingerprint size={15}/> Device login</button><button className="logout-btn" onClick={signOut}><LogOut size={16}/> Sign out</button></div>
+      <div className="sidebar-footer"><div className="privacy-card"><ShieldCheck size={18}/><div><strong>Private mode</strong><span>Owner-only database access.</span></div></div><button className="device-security-btn" onClick={()=>setShowPasskeyManager(true)}><Fingerprint size={15}/> Security</button><button className="logout-btn" onClick={signOut}><LogOut size={16}/> Sign out</button></div>
     </aside>
     {mobileOpen&&<button className="backdrop" onClick={()=>setMobileOpen(false)}/>}<main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-btn mobile-menu" onClick={()=>setMobileOpen(true)}><Menu size={20}/></button><div><div className="eyebrow">PRIVATE DASHBOARD</div><h1>{activeModule.label}</h1></div></div><div className="topbar-actions"><button className="primary-btn" onClick={()=>active==='pocket'?openTransaction('expense'):active==='reminders'?openReminder():active==='passwords'?openPassword():active==='notes'?openNote():setQuickAdd(true)}><Plus size={17}/> Quick add</button></div></header>
        <section className="content">{(active==='pocket'||active==='reminders')&&<div className="hero-row"><div><span className="pill"><span className="status-dot"/> Private workspace</span><h2>Everything personal,<br/><span>in one place.</span></h2><p>Expenses, reminders, passwords and notes with one clean interface across your devices.</p></div><div className="date-card"><div className="date-label">TODAY</div><div className="date-value">{new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div><div className="date-helper">{user.email}</div></div></div>}
         {active==='pocket'?<Pocket user={user} onQuickAdd={openTransaction}/>:active==='reminders'?<Reminders user={user}/>:active==='passwords'?<Passwords user={user}/>:active==='notes'?<Notes user={user}/>:<div className="workspace-grid"><section className="panel large-panel"><div className="panel-header"><div><div className="panel-kicker">MODULE</div><h3>{activeModule.label}</h3></div><button className="text-btn" onClick={()=>quickCreate(active)}>Add new <Plus size={15}/></button></div></section></div>}
       </section></main>
     {quickAdd&&<div className="modal-layer"><div className="modal quick-add-modal"><div className="modal-header"><div><div className="panel-kicker">QUICK ADD</div><h3>What do you want to create?</h3><p className="modal-subtle">Choose the workspace item you want to add.</p></div><button className="icon-btn" onClick={()=>setQuickAdd(false)}><X size={18}/></button></div><div className="quick-grid">{modules.map(m=>{const Icon=m.icon;return <button key={m.id} className="quick-option" onClick={()=>quickCreate(m.id)}><span className="module-icon"><Icon size={20}/></span><span><strong>{m.label}</strong><small>{m.description}</small></span><ChevronRight size={15}/></button>})}</div></div></div>}
-    <PasskeyManager open={showPasskeyManager} onClose={()=>setShowPasskeyManager(false)} user={user}/>
+    <PasskeyManager
+      open={showPasskeyManager}
+      onClose={()=>setShowPasskeyManager(false)}
+      user={user}
+      autoLockMinutes={autoLockMinutes}
+      onAutoLockChange={setAutoLockMinutes}
+      onLockNow={()=>void signOut()}
+    />
   </div>
 }
 export default App
