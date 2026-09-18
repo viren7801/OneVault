@@ -123,7 +123,7 @@ async function connectTelegram(admin, userId) {
   await telegramRequest("setWebhook", {
     url: functionUrl() + "?action=webhook",
     secret_token: webhookSecret,
-    allowed_updates: ["message"],
+    allowed_updates: ["message", "callback_query"],
   });
 
   const token = randomToken();
@@ -208,12 +208,125 @@ async function testTelegram(admin, userId) {
   return { sent: true };
 }
 
+
+function snoozeKeyboard(reminderId) {
+  return {
+    inline_keyboard: [
+      [
+        { text: "5 min", callback_data: "snooze:" + reminderId + ":5" },
+        { text: "10 min", callback_data: "snooze:" + reminderId + ":10" },
+      ],
+      [
+        { text: "30 min", callback_data: "snooze:" + reminderId + ":30" },
+        { text: "1 hour", callback_data: "snooze:" + reminderId + ":60" },
+      ],
+    ],
+  };
+}
+
+function snoozeLabel(minutes) {
+  if (minutes === 60) return "1 hour";
+  return minutes + " min";
+}
+
+async function callbackQuery(update) {
+  const callback = update && update.callback_query;
+  if (!callback || !callback.id) return json({ ok: true });
+
+  const data = typeof callback.data === "string" ? callback.data.trim() : "";
+  const match = data.match(/^snooze:([0-9a-f-]{36}):(5|10|30|60)$/i);
+
+  if (!match || !callback.message || !callback.message.chat || callback.message.chat.id == null) {
+    await telegramRequest("answerCallbackQuery", {
+      callback_query_id: callback.id,
+      text: "Invalid reminder action.",
+      show_alert: true,
+    }).catch(function() {});
+    return json({ ok: true });
+  }
+
+  const reminderId = match[1];
+  const minutes = Number(match[2]);
+  const chatId = String(callback.message.chat.id);
+  const admin = getAdminClient();
+
+  const connection = await admin
+    .from("telegram_connection")
+    .select("user_id")
+    .eq("chat_id", chatId)
+    .maybeSingle();
+
+  if (connection.error) throw connection.error;
+
+  if (!connection.data || !connection.data.user_id) {
+    await telegramRequest("answerCallbackQuery", {
+      callback_query_id: callback.id,
+      text: "Telegram is no longer connected.",
+      show_alert: true,
+    }).catch(function() {});
+    return json({ ok: true });
+  }
+
+  const nextDue = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+
+  const updateResult = await admin
+    .from("reminders")
+    .update({
+      due_at: nextDue,
+      completed: false,
+      telegram_sent_at: null,
+      telegram_locked_at: null,
+      telegram_attempts: 0,
+      telegram_last_error: null,
+    })
+    .eq("id", reminderId)
+    .eq("user_id", connection.data.user_id)
+    .eq("notify_telegram", true)
+    .eq("completed", false)
+    .select("id, title, due_at")
+    .maybeSingle();
+
+  if (updateResult.error) throw updateResult.error;
+
+  if (!updateResult.data) {
+    await telegramRequest("answerCallbackQuery", {
+      callback_query_id: callback.id,
+      text: "This reminder is no longer active.",
+      show_alert: true,
+    }).catch(function() {});
+    return json({ ok: true });
+  }
+
+  const label = snoozeLabel(minutes);
+
+  await telegramRequest("answerCallbackQuery", {
+    callback_query_id: callback.id,
+    text: "Reminded again in " + label + ".",
+  });
+
+  if (callback.message.message_id != null) {
+    const originalText = typeof callback.message.text === "string" && callback.message.text
+      ? callback.message.text
+      : "🔔 oneVault reminder\n\n" + updateResult.data.title;
+
+    await telegramRequest("editMessageText", {
+      chat_id: chatId,
+      message_id: callback.message.message_id,
+      text: originalText + "\n\n⏱ Snoozed for " + label + "\nNext reminder: " + formatReminderTime(updateResult.data.due_at),
+      reply_markup: { inline_keyboard: [] },
+    }).catch(function() {});
+  }
+
+  return json({ ok: true, snoozed: true, reminderId, minutes });
+}
+
 async function webhook(req) {
   const expected = await vaultSecret("onevault_telegram_webhook_secret");
   const received = req.headers.get("x-telegram-bot-api-secret-token");
   if (!expected || received !== expected) return json({ error: "Invalid webhook secret." }, 401);
 
   const update = await req.json().catch(function() { return null; });
+  if (update && update.callback_query) return await callbackQuery(update);
   const message = update && update.message;
   const text = message && typeof message.text === "string" ? message.text.trim() : "";
   const match = text.match(/^\/start(?:@\w+)?(?:\s+(.+))?$/i);
@@ -327,7 +440,8 @@ async function worker(req) {
 
       await telegramRequest("sendMessage", {
         chat_id: connection.data.chat_id,
-        text: "🔔 oneVault reminder\n\n" + claim.data.title + "\n" + formatReminderTime(claim.data.due_at),
+        text: "🔔 oneVault reminder\n\n" + claim.data.title + "\n" + formatReminderTime(claim.data.due_at) + "\n\nNeed a little more time?",
+        reply_markup: snoozeKeyboard(claim.data.id),
       });
 
       const markSent = await admin
