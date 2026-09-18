@@ -37,7 +37,7 @@ function AuthScreen({ onSignedIn }) {
       if (allowed && email.trim().toLowerCase() !== allowed) throw new Error('This oneVault build is restricted to the owner account.')
       const { data, error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
       if (signInError) throw signInError
-      onSignedIn(data.user)
+      onSignedIn(data.user, true)
     } catch (err) { setError(err.message || 'Unable to sign in.') }
     finally { setBusy(false) }
   }
@@ -53,7 +53,7 @@ function AuthScreen({ onSignedIn }) {
         await supabase.auth.signOut({ scope: 'local' })
         throw new Error('This passkey is not registered to the oneVault owner account.')
       }
-      onSignedIn(data.user)
+      onSignedIn(data.user, false)
     } catch (err) {
       setError(err.message || 'Device sign-in failed or was cancelled.')
     } finally { setPasskeyBusy(false) }
@@ -846,7 +846,21 @@ function App() {
   }, [])
 
   if (authLoading) return <div className="loading-screen">Loading oneVault…</div>
-  if (!user) return <AuthScreen onSignedIn={setUser}/>
+
+  async function handleSignedIn(signedUser, offerDeviceSetup = false) {
+    setUser(signedUser)
+    if (!offerDeviceSetup) return
+    try {
+      const { data, error } = await supabase.auth.passkey.list()
+      if (!error && (!data || data.length === 0)) {
+        window.setTimeout(() => setShowPasskeyManager(true), 250)
+      }
+    } catch {
+      // Password sign-in remains fully usable even when passkey enrollment is unavailable.
+    }
+  }
+
+  if (!user) return <AuthScreen onSignedIn={handleSignedIn}/>
 
   async function signOut() { await supabase.auth.signOut({ scope: 'local' }); setUser(null) }
   function openTransaction(type = 'expense') { setTransactionType(type); setQuickAdd(false); window.dispatchEvent(new CustomEvent('onevault:open-transaction', { detail: type })) }
