@@ -731,3 +731,52 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .device-unlock-btn:disabled{opacity:.6;cursor:wait;transform:none}
 .vault-divider{display:flex;align-items:center;gap:10px;margin:15px 0;color:#65656f;font-size:8px;text-transform:uppercase;letter-spacing:.11em}
 .vault-divider::before,.vault-divider::after{content:"";height:1px;flex:1;background:rgba(255,255,255,.06)}
+
+/* Vault password fields */
+.vault-gate-form label {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+  width: 100%;
+}
+.vault-gate-form label > span {
+  display: block;
+  color: #85858e;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.vault-gate-form input {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  padding: 0 13px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 11px;
+  color: #eeeef1;
+  background: rgba(255,255,255,.035);
+  outline: none;
+  font-size: 12px;
+  line-height: 1;
+}
+.vault-gate-form input::placeholder {
+  color: #5f5f69;
+}
+.vault-gate-form input:focus {
+  border-color: rgba(181,170,255,.42);
+  box-shadow: 0 0 0 3px rgba(112,71,255,.10);
+}
+.vault-gate-form input:-webkit-autofill,
+.vault-gate-form input:-webkit-autofill:hover,
+.vault-gate-form input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #eeeef1;
+  -webkit-box-shadow: 0 0 0 1000px rgba(255,255,255,.035) inset;
+  transition: background-color 9999s ease-out 0s;
+}
+@media (max-width: 760px) {
+  .vault-gate {
+    width: 100%;
+    margin-top: 12px;
+    padding: 22px 18px;
+  }
+}
