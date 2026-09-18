@@ -5,6 +5,8 @@ import {
   Trash2, WalletCards, X, TrendingDown, TrendingUp, PiggyBank, RefreshCw,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
+import Passwords from './Passwords'
+import Notes from './Notes'
 
 const modules = [
   { id: 'pocket', label: 'Pocket', icon: CircleDollarSign, description: 'Expenses, budgets & accounts' },
@@ -827,17 +829,28 @@ function App() {
   async function signOut() { await supabase.auth.signOut(); setUser(null) }
   function openTransaction(type = 'expense') { setTransactionType(type); setQuickAdd(false); window.dispatchEvent(new CustomEvent('onevault:open-transaction', { detail: type })) }
   function openReminder() { setQuickAdd(false); window.dispatchEvent(new CustomEvent('onevault:open-reminder')) }
+  function openPassword() { setQuickAdd(false); window.dispatchEvent(new CustomEvent('onevault:open-password')) }
+  function openNote() { setQuickAdd(false); window.dispatchEvent(new CustomEvent('onevault:open-note')) }
+  function quickCreate(moduleId) {
+    setActive(moduleId)
+    setQuickAdd(false)
+    setMobileOpen(false)
+    if (moduleId === 'pocket') openTransaction('expense')
+    if (moduleId === 'reminders') openReminder()
+    if (moduleId === 'passwords') window.setTimeout(openPassword, 50)
+    if (moduleId === 'notes') window.setTimeout(openNote, 50)
+  }
 
   return <div className="app-shell"><div className="ambient ambient-one"/><div className="ambient ambient-two"/>
     <aside className={`sidebar ${mobileOpen?'open':''}`}><div className="brand-row"><div className="brand-mark">1</div><div><div className="brand-title">oneVault</div><div className="brand-subtitle">Personal workspace</div></div><button className="icon-btn mobile-close" onClick={()=>setMobileOpen(false)}><X size={18}/></button></div>
       <nav className="module-nav"><div className="nav-label">YOUR SPACE</div>{modules.map(m=>{const Icon=m.icon;return <button key={m.id} className={`module-btn ${active===m.id?'selected':''}`} onClick={()=>{setActive(m.id);setMobileOpen(false)}}><span className="module-icon"><Icon size={19}/></span><span className="module-copy"><strong>{m.label}</strong><small>{m.description}</small></span><ChevronRight size={15} className="module-arrow"/></button>})}</nav>
       <div className="sidebar-footer"><div className="privacy-card"><ShieldCheck size={18}/><div><strong>Private mode</strong><span>Owner-only database access.</span></div></div><button className="logout-btn" onClick={signOut}><LogOut size={16}/> Sign out</button></div>
     </aside>
-    {mobileOpen&&<button className="backdrop" onClick={()=>setMobileOpen(false)}/>}<main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-btn mobile-menu" onClick={()=>setMobileOpen(true)}><Menu size={20}/></button><div><div className="eyebrow">PRIVATE DASHBOARD</div><h1>{activeModule.label}</h1></div></div><div className="topbar-actions"><button className="primary-btn" onClick={()=>active==='pocket'?openTransaction('expense'):active==='reminders'?openReminder():setQuickAdd(true)}><Plus size={17}/> Quick add</button></div></header>
+    {mobileOpen&&<button className="backdrop" onClick={()=>setMobileOpen(false)}/>}<main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-btn mobile-menu" onClick={()=>setMobileOpen(true)}><Menu size={20}/></button><div><div className="eyebrow">PRIVATE DASHBOARD</div><h1>{activeModule.label}</h1></div></div><div className="topbar-actions"><button className="primary-btn" onClick={()=>active==='pocket'?openTransaction('expense'):active==='reminders'?openReminder():active==='passwords'?openPassword():active==='notes'?openNote():setQuickAdd(true)}><Plus size={17}/> Quick add</button></div></header>
       <section className="content"><div className="hero-row"><div><span className="pill"><span className="status-dot"/> Private workspace</span><h2>Everything personal,<br/><span>in one place.</span></h2><p>Expenses, reminders, passwords and notes with one clean interface across your devices.</p></div><div className="date-card"><div className="date-label">TODAY</div><div className="date-value">{new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div><div className="date-helper">{user.email}</div></div></div>
-        {active==='pocket'?<Pocket user={user} onQuickAdd={openTransaction}/>:active==='reminders'?<Reminders user={user}/>:<div className="workspace-grid"><section className="panel large-panel"><div className="panel-header"><div><div className="panel-kicker">MODULE</div><h3>{activeModule.label}</h3></div><button className="text-btn" onClick={()=>setQuickAdd(true)}>Add new <Plus size={15}/></button></div><div className="empty-state"><div className="empty-icon">{(()=>{const Icon=activeModule.icon;return <Icon size={25}/>})()}</div><h4>{activeModule.label} is next</h4><p>The secure backend is ready. We’ll build this module on the same private foundation.</p><button className="primary-btn" onClick={()=>setQuickAdd(true)}><Plus size={16}/> Explore actions</button></div></section><section className="panel security-panel"><div className="panel-kicker">SECURITY FOUNDATION</div><h3>Private by design.</h3><p>Authentication and database access are enforced before sensitive data is connected.</p><div className="security-list"><div><Check size={16}/> Owner-only access</div><div><Check size={16}/> Row-level security</div><div><Check size={16}/> Encrypted password vault</div><div><Check size={16}/> Cross-device sync</div></div></section></div>}
+        {active==='pocket'?<Pocket user={user} onQuickAdd={openTransaction}/>:active==='reminders'?<Reminders user={user}/>:active==='passwords'?<Passwords user={user}/>:active==='notes'?<Notes user={user}/>:<div className="workspace-grid"><section className="panel large-panel"><div className="panel-header"><div><div className="panel-kicker">MODULE</div><h3>{activeModule.label}</h3></div><button className="text-btn" onClick={()=>quickCreate(active)}>Add new <Plus size={15}/></button></div></section></div>}
       </section></main>
-    {quickAdd&&<div className="modal-layer"><div className="modal"><div className="modal-header"><div><div className="panel-kicker">QUICK ADD</div><h3>What do you want to create?</h3></div><button className="icon-btn" onClick={()=>setQuickAdd(false)}><X size={18}/></button></div><div className="quick-grid">{modules.map(m=>{const Icon=m.icon;return <button key={m.id} className="quick-option" onClick={()=>{setActive(m.id);setQuickAdd(false)}}><span className="module-icon"><Icon size={20}/></span><span><strong>{m.label}</strong><small>{m.description}</small></span><ChevronRight size={15}/></button>})}</div></div></div>}
+    {quickAdd&&<div className="modal-layer"><div className="modal quick-add-modal"><div className="modal-header"><div><div className="panel-kicker">QUICK ADD</div><h3>What do you want to create?</h3><p className="modal-subtle">Choose the workspace item you want to add.</p></div><button className="icon-btn" onClick={()=>setQuickAdd(false)}><X size={18}/></button></div><div className="quick-grid">{modules.map(m=>{const Icon=m.icon;return <button key={m.id} className="quick-option" onClick={()=>quickCreate(m.id)}><span className="module-icon"><Icon size={20}/></span><span><strong>{m.label}</strong><small>{m.description}</small></span><ChevronRight size={15}/></button>})}</div></div></div>}
   </div>
 }
 export default App
