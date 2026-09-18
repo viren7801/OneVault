@@ -1,7 +1,8 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Copy, Edit3, Eye, EyeOff, KeyRound, Lock, Plus, Search, ShieldCheck, Star, Trash2, Wand2, X } from 'lucide-react'
+import { Check, Copy, Edit3, Eye, EyeOff, KeyRound, Lock, Plus, Search, ShieldCheck, Star, Trash2, Wand2, X, Fingerprint } from 'lucide-react'
 import { supabase } from './lib/supabase'
+import { isDeviceUnlockAvailable, registerDeviceUnlock, unlockWithDevice } from './vaultDeviceUnlock'
 
 const PBKDF2_ITERATIONS = 600000
 const CATEGORIES = ['Personal','Work','Finance','Social','Shopping','Other']
@@ -43,6 +44,8 @@ export default function Passwords({user}){
   const keyRef=useRef(null),[query,setQuery]=useState(''),[category,setCategory]=useState('all'),[selectedId,setSelectedId]=useState(null)
   const [form,setForm]=useState(blankForm),[editing,setEditing]=useState(null),[showForm,setShowForm]=useState(false),[showSecret,setShowSecret]=useState(false)
   const [showChange,setShowChange]=useState(false),[newMaster,setNewMaster]=useState(''),[newMasterConfirm,setNewMasterConfirm]=useState(''),[copied,setCopied]=useState('')
+  const [biometricAvailable,setBiometricAvailable]=useState(false),[biometricBusy,setBiometricBusy]=useState(false)
+  const masterRef=useRef('')
 
   async function load(){
     setPhase('loading')
@@ -50,7 +53,7 @@ export default function Passwords({user}){
     if(e){setError(e.message);setPhase('setup');return}
     setMeta(data||null);setEntries([]);keyRef.current=null;setSelectedId(null);setPhase(data?'locked':'setup')
   }
-  useEffect(()=>{void load()},[user.id])
+  useEffect(()=>{void load();void isDeviceUnlockAvailable().then(setBiometricAvailable)},[user.id])
   useEffect(()=>{function open(){if(phase==='unlocked')openNew()} window.addEventListener('onevault:open-password',open);return()=>window.removeEventListener('onevault:open-password',open)},[phase])
 
   const filtered=useMemo(()=>{
@@ -71,16 +74,52 @@ export default function Passwords({user}){
       const salt=b64(crypto.getRandomValues(new Uint8Array(16))),key=await deriveKey(master,salt),encrypted=await encryptEntries([],key)
       const row={user_id:user.id,vault_version:1,salt,iv:encrypted.iv,ciphertext:encrypted.ciphertext,updated_at:new Date().toISOString()}
       const {error:e}=await supabase.from('password_vaults').upsert(row);if(e)throw e
-      keyRef.current=key;setMeta(row);setEntries([]);setMaster('');setConfirm('');setPhase('unlocked')
+      keyRef.current=key;masterRef.current=master;setMeta(row);setEntries([]);setMaster('');setConfirm('');setPhase('unlocked')
     }catch(err){setError(err.message||'Could not create the password vault.')}finally{setBusy(false)}
+  }
+  async function unlockFromMaster(password){
+    const key=await deriveKey(password,meta.salt)
+    const value=await decryptEntries(meta.iv,meta.ciphertext,key)
+    keyRef.current=key
+    masterRef.current=password
+    setEntries(value)
+    setSelectedId(value[0]?.id||null)
+    setMaster('')
+    setPhase('unlocked')
   }
   async function unlock(e){
     e.preventDefault();setError('');if(!master)return setError('Enter your vault password.')
     setBusy(true)
-    try{const key=await deriveKey(master,meta.salt),value=await decryptEntries(meta.iv,meta.ciphertext,key);keyRef.current=key;setEntries(value);setSelectedId(value[0]?.id||null);setMaster('');setPhase('unlocked')}
-    catch{keyRef.current=null;setError('Incorrect vault password or corrupted vault.')}finally{setBusy(false)}
+    try{await unlockFromMaster(master)}
+    catch{keyRef.current=null;masterRef.current='';setError('Incorrect vault password or corrupted vault.')}finally{setBusy(false)}
   }
-  function lockVault(){keyRef.current=null;setEntries([]);setSelectedId(null);setShowForm(false);setEditing(null);setShowChange(false);setPhase('locked')}
+  async function unlockBiometric(){
+    if(!meta?.biometric_credential_id)return
+    setError('');setBiometricBusy(true)
+    try{
+      const password=await unlockWithDevice({credential_id:meta.biometric_credential_id,prf_salt:meta.biometric_prf_salt,iv:meta.biometric_iv,ciphertext:meta.biometric_ciphertext})
+      await unlockFromMaster(password)
+    }catch(err){setError(err.message||'Device unlock failed.')}finally{setBiometricBusy(false)}
+  }
+  async function enableBiometric(){
+    if(!masterRef.current)return setError('Unlock the vault with your password first.')
+    setError('');setBiometricBusy(true)
+    try{
+      const wrapped=await registerDeviceUnlock(masterRef.current,user.email||'oneVault')
+      const row={...meta,biometric_credential_id:wrapped.credential_id,biometric_prf_salt:wrapped.prf_salt,biometric_iv:wrapped.iv,biometric_ciphertext:wrapped.ciphertext,updated_at:new Date().toISOString()}
+      const {error:e}=await supabase.from('password_vaults').upsert(row);if(e)throw e
+      setMeta(row)
+    }catch(err){setError(err.message||'Could not enable device unlock.')}finally{setBiometricBusy(false)}
+  }
+  async function disableBiometric(){
+    setError('');setBiometricBusy(true)
+    try{
+      const row={...meta,biometric_credential_id:null,biometric_prf_salt:null,biometric_iv:null,biometric_ciphertext:null,updated_at:new Date().toISOString()}
+      const {error:e}=await supabase.from('password_vaults').upsert(row);if(e)throw e
+      setMeta(row)
+    }catch(err){setError(err.message||'Could not disable device unlock.')}finally{setBiometricBusy(false)}
+  }
+  function lockVault(){keyRef.current=null;masterRef.current='';setEntries([]);setSelectedId(null);setShowForm(false);setEditing(null);setShowChange(false);setPhase('locked')}
   async function persist(next,nextMeta=meta,key=keyRef.current){
     if(!key||!nextMeta)throw new Error('Unlock the password vault first.')
     const encrypted=await encryptEntries(next,key),row={...nextMeta,iv:encrypted.iv,ciphertext:encrypted.ciphertext,updated_at:new Date().toISOString()}
@@ -109,7 +148,7 @@ export default function Passwords({user}){
     try{
       const salt=b64(crypto.getRandomValues(new Uint8Array(16))),key=await deriveKey(newMaster,salt),encrypted=await encryptEntries(entries,key),row={...meta,salt,iv:encrypted.iv,ciphertext:encrypted.ciphertext,updated_at:new Date().toISOString()}
       const {error:e}=await supabase.from('password_vaults').upsert(row);if(e)throw e
-      keyRef.current=key;setMeta(row);setNewMaster('');setNewMasterConfirm('');setShowChange(false)
+      keyRef.current=key;masterRef.current=newMaster;setMeta(row);setNewMaster('');setNewMasterConfirm('');setShowChange(false)
     }catch(err){setError(err.message||'Could not change vault password.')}finally{setBusy(false)}
   }
   async function copyValue(label,value){try{await navigator.clipboard.writeText(value);setCopied(label);setTimeout(()=>setCopied(''),1400)}catch{setError('Clipboard access was blocked by the browser.')}}
@@ -122,11 +161,11 @@ export default function Passwords({user}){
   if(phase==='loading')return <div className="workspace-loading">Loading password vault…</div>
   if(phase==='setup'||phase==='locked'){
     const setup=phase==='setup'
-    return <div className="vault-gate"><div className="vault-gate-icon"><ShieldCheck size={24}/></div><div className="panel-kicker">SECURE VAULT</div><h2>{setup?'Create your password vault':'Unlock your password vault'}</h2><p>{setup?'Passwords are encrypted in your browser before they are synced to Supabase.':'Your master password is required to decrypt this vault.'}</p><form onSubmit={setup?createVault:unlock} className="vault-gate-form"><label><span>Master password</span><input type="password" value={master} onChange={e=>setMaster(e.target.value)} placeholder="At least 12 characters" autoFocus/></label>{setup&&<label><span>Confirm password</span><input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} placeholder="Repeat the vault password"/></label>}{error&&<div className="form-error">{error}</div>}<button className="primary-btn" disabled={busy}>{busy?'Working…':setup?'Create secure vault':'Unlock vault'}</button></form><div className="vault-gate-note"><Lock size={13}/> The encrypted vault cannot be decrypted without your master password.</div></div>
+    return <div className="vault-gate"><div className="vault-gate-icon"><ShieldCheck size={24}/></div><div className="panel-kicker">SECURE VAULT</div><h2>{setup?'Create your password vault':'Unlock your password vault'}</h2><p>{setup?'Passwords are encrypted in your browser before they are synced to Supabase.':'Use your vault password or this device’s secure unlock.'}</p>{!setup&&meta?.biometric_credential_id&&biometricAvailable&&<button className="device-unlock-btn" onClick={()=>void unlockBiometric()} disabled={biometricBusy}><Fingerprint size={16}/>{biometricBusy?'Waiting for device…':'Unlock with Face ID / fingerprint / Windows Hello'}</button>}{!setup&&meta?.biometric_credential_id&&biometricAvailable&&<div className="vault-divider"><span>or use password</span></div>}<form onSubmit={setup?createVault:unlock} className="vault-gate-form"><label><span>Master password</span><input type="password" value={master} onChange={e=>setMaster(e.target.value)} placeholder="At least 12 characters" autoFocus/></label>{setup&&<label><span>Confirm password</span><input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} placeholder="Repeat the vault password"/></label>}{error&&<div className="form-error">{error}</div>}<button className="primary-btn" disabled={busy}>{busy?'Working…':setup?'Create secure vault':'Unlock vault'}</button></form><div className="vault-gate-note"><Lock size={13}/> Your master password stays local; device unlock uses WebAuthn user verification when supported.</div></div>
   }
 
   return <div className="passwords-page">
-    <div className="module-toolbar"><div><div className="panel-kicker">SECURE VAULT</div><h2>Password manager.</h2><p>{entries.length} encrypted entries · synced across devices.</p></div><div className="module-toolbar-actions"><button className="secondary-btn" onClick={exportBackup}><span className="text-icon">↓</span> Backup</button><button className="secondary-btn" onClick={()=>setShowChange(true)}><KeyRound size={14}/> Change password</button><button className="secondary-btn" onClick={lockVault}><Lock size={14}/> Lock</button><button className="primary-btn" onClick={openNew}><Plus size={15}/> Add password</button></div></div>
+    <div className="module-toolbar"><div><div className="panel-kicker">SECURE VAULT</div><h2>Password manager.</h2><p>{entries.length} encrypted entries · synced across devices.</p></div><div className="module-toolbar-actions"><button className="secondary-btn" onClick={exportBackup}><span className="text-icon">↓</span> Backup</button><button className="secondary-btn" onClick={()=>setShowChange(true)}><KeyRound size={14}/> Change password</button>{meta?.biometric_credential_id?<button className="secondary-btn" onClick={()=>void disableBiometric()} disabled={biometricBusy}><Fingerprint size={14}/> {biometricBusy?'Updating…':'Device unlock on'}</button>:biometricAvailable?<button className="secondary-btn" onClick={()=>void enableBiometric()} disabled={biometricBusy}><Fingerprint size={14}/> {biometricBusy?'Enabling…':'Enable device unlock'}</button>:null}<button className="secondary-btn" onClick={lockVault}><Lock size={14}/> Lock</button><button className="primary-btn" onClick={openNew}><Plus size={15}/> Add password</button></div></div>
     {error&&<div className="form-error">{error}</div>}
     <div className="passwords-toolbar panel"><div className="search-box"><Search size={15}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search website, username or category"/></div><div className="password-category-tabs">{['all',...CATEGORIES].map(item=><button key={item} className={category===item?'active':''} onClick={()=>setCategory(item)}>{item==='all'?'All':item}</button>)}</div></div>
     <div className="passwords-layout">
