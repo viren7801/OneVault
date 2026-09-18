@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Bell, Check, ChevronRight, CircleDollarSign, CreditCard, Edit3, Filter,
+  Bell, Check, ChevronRight, CircleDollarSign, CreditCard, Edit3, Filter, MessageCircle,
   LockKeyhole, LogOut, Menu, NotebookPen, Plus, Search, ShieldCheck,
   Trash2, WalletCards, X, TrendingDown, TrendingUp, PiggyBank, RefreshCw,
 } from 'lucide-react'
@@ -288,13 +288,14 @@ const nextReminderDate = (value, rule) => {
 const formatReminderTime = (value) => new Date(value).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
 const formatReminderDate = (value) => new Date(value).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
 
-function ReminderModal({ user, initial, onClose, onSaved }) {
+function ReminderModal({ user, initial, onClose, onSaved, telegramConnected }) {
   const isEdit = Boolean(initial?.id)
   const [title, setTitle] = useState(initial?.title || '')
   const [description, setDescription] = useState(initial?.description || '')
   const [dueAt, setDueAt] = useState(toDateTimeLocal(initial?.due_at))
   const [priority, setPriority] = useState(initial?.priority || 'medium')
   const [repeatRule, setRepeatRule] = useState(initial?.repeat_rule || '')
+  const [notifyTelegram, setNotifyTelegram] = useState(Boolean(initial?.notify_telegram))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -306,6 +307,18 @@ function ReminderModal({ user, initial, onClose, onSaved }) {
       if (!title.trim()) throw new Error('Enter a reminder title.')
       const due = new Date(dueAt)
       if (Number.isNaN(due.getTime())) throw new Error('Choose a valid date and time.')
+      if (notifyTelegram && !telegramConnected) {
+        throw new Error('Connect Telegram before enabling Telegram delivery.')
+      }
+
+      const dueChanged =
+        Boolean(initial?.due_at) &&
+        new Date(initial.due_at).getTime() !== due.getTime()
+      const notificationSettingsChanged =
+        Boolean(initial?.notify_telegram) !== notifyTelegram
+      const shouldResetTelegram =
+        !isEdit || dueChanged || notificationSettingsChanged
+
       const payload = {
         user_id: user.id,
         title: title.trim(),
@@ -314,7 +327,16 @@ function ReminderModal({ user, initial, onClose, onSaved }) {
         repeat_rule: repeatRule || null,
         priority,
         completed: initial?.completed || false,
+        notify_telegram: notifyTelegram,
       }
+
+      if (shouldResetTelegram) {
+        payload.telegram_sent_at = null
+        payload.telegram_locked_at = null
+        payload.telegram_attempts = 0
+        payload.telegram_last_error = null
+      }
+
       const response = isEdit
         ? await supabase.from('reminders').update(payload).eq('id', initial.id).eq('user_id', user.id).select().single()
         : await supabase.from('reminders').insert(payload).select().single()
@@ -341,6 +363,24 @@ function ReminderModal({ user, initial, onClose, onSaved }) {
         <label><span>Priority</span><select value={priority} onChange={e=>setPriority(e.target.value)}>{reminderPriorities.map(item=><option key={item} value={item}>{item[0].toUpperCase()+item.slice(1)}</option>)}</select></label>
       </div>
       <label><span>Repeat</span><select value={repeatRule} onChange={e=>setRepeatRule(e.target.value)}>{reminderRepeats.map(item=><option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+
+      <label className="telegram-option">
+        <input
+          type="checkbox"
+          checked={notifyTelegram}
+          disabled={!telegramConnected}
+          onChange={e=>setNotifyTelegram(e.target.checked)}
+        />
+        <span className="telegram-option-copy">
+          <span className="telegram-option-title"><MessageCircle size={13}/> Send reminder on Telegram</span>
+          <span className="telegram-option-sub">
+            {telegramConnected
+              ? (notifyTelegram ? 'This reminder will be sent only to Telegram.' : 'Leave unchecked to use your normal reminder flow.')
+              : 'Connect Telegram from the Reminders screen first.'}
+          </span>
+        </span>
+      </label>
+
       {error&&<div className="form-error">{error}</div>}
       <div className="modal-actions"><button type="button" className="secondary-btn" onClick={onClose}>Cancel</button><button className="primary-btn" disabled={busy}>{busy?'Saving…':isEdit?'Save changes':'Create reminder'}</button></div>
     </form>
@@ -358,6 +398,107 @@ function Reminders({ user }) {
   const [hoveredDate, setHoveredDate] = useState(null)
   const hoverVibrationRef = useRef(null)
   const [modal, setModal] = useState(null)
+  const [telegramConnected, setTelegramConnected] = useState(false)
+  const [telegramUsername, setTelegramUsername] = useState('')
+  const [telegramBusy, setTelegramBusy] = useState(false)
+  const [telegramError, setTelegramError] = useState('')
+  const [telegramNotice, setTelegramNotice] = useState('')
+  const [telegramConnectUrl, setTelegramConnectUrl] = useState('')
+  const [telegramModal, setTelegramModal] = useState(false)
+
+  async function invokeTelegram(action) {
+    const { data, error } = await supabase.functions.invoke('telegram', {
+      body: { action },
+    })
+
+    if (error) {
+      let message = error.message || 'Telegram request failed.'
+      try {
+        const body = error.context ? await error.context.json() : null
+        if (body?.error) message = body.error
+      } catch {}
+      throw new Error(message)
+    }
+
+    if (data?.error) throw new Error(data.error)
+    return data || {}
+  }
+
+  async function checkTelegramConnection({ silent = false } = {}) {
+    if (!silent) {
+      setTelegramBusy(true)
+      setTelegramError('')
+      setTelegramNotice('')
+    }
+
+    try {
+      const data = await invokeTelegram('status')
+      setTelegramConnected(Boolean(data.connected))
+      setTelegramUsername(data.username || data.firstName || '')
+      return Boolean(data.connected)
+    } catch (err) {
+      setTelegramConnected(false)
+      setTelegramUsername('')
+      if (!silent) setTelegramError(err.message || 'Could not check Telegram connection.')
+      return false
+    } finally {
+      if (!silent) setTelegramBusy(false)
+    }
+  }
+
+  async function connectTelegram() {
+    setTelegramBusy(true)
+    setTelegramError('')
+    setTelegramNotice('')
+
+    try {
+      const data = await invokeTelegram('connect')
+      setTelegramConnectUrl(data.url || '')
+      setTelegramModal(true)
+      if (data.url) {
+        window.open(data.url, '_blank', 'noopener,noreferrer')
+      }
+    } catch (err) {
+      setTelegramError(err.message || 'Could not start Telegram connection.')
+      setTelegramModal(true)
+    } finally {
+      setTelegramBusy(false)
+    }
+  }
+
+  async function testTelegram() {
+    setTelegramBusy(true)
+    setTelegramError('')
+    setTelegramNotice('')
+
+    try {
+      await invokeTelegram('test')
+      setTelegramNotice('Test message sent to Telegram.')
+    } catch (err) {
+      setTelegramError(err.message || 'Could not send Telegram test message.')
+    } finally {
+      setTelegramBusy(false)
+    }
+  }
+
+  async function disconnectTelegram() {
+    setTelegramBusy(true)
+    setTelegramError('')
+    setTelegramNotice('')
+
+    try {
+      await invokeTelegram('disconnect')
+      setTelegramConnected(false)
+      setTelegramUsername('')
+      setTelegramConnectUrl('')
+      setTelegramNotice('Telegram disconnected. Telegram delivery was disabled for your reminders.')
+      await load()
+    } catch (err) {
+      setTelegramError(err.message || 'Could not disconnect Telegram.')
+    } finally {
+      setTelegramBusy(false)
+    }
+  }
 
   async function load() {
     setLoading(true)
@@ -369,6 +510,9 @@ function Reminders({ user }) {
   }
 
   useEffect(() => { load() }, [])
+  useEffect(() => {
+    checkTelegramConnection({ silent: true })
+  }, [])
   useEffect(() => {
     function handleOpen() { setModal({}) }
     window.addEventListener('onevault:open-reminder', handleOpen)
@@ -425,7 +569,16 @@ function Reminders({ user }) {
   async function toggleComplete(reminder) {
     try {
       const nextCompleted = !reminder.completed
-      const { data, error } = await supabase.from('reminders').update({ completed: nextCompleted }).eq('id', reminder.id).eq('user_id', user.id).select().single()
+      const payload = { completed: nextCompleted }
+
+      if (!nextCompleted) {
+        payload.telegram_sent_at = null
+        payload.telegram_locked_at = null
+        payload.telegram_attempts = 0
+        payload.telegram_last_error = null
+      }
+
+      const { data, error } = await supabase.from('reminders').update(payload).eq('id', reminder.id).eq('user_id', user.id).select().single()
       if (error) throw error
 
       if (nextCompleted && reminder.repeat_rule) {
@@ -438,6 +591,11 @@ function Reminders({ user }) {
           repeat_rule: reminder.repeat_rule,
           priority: reminder.priority,
           completed: false,
+          notify_telegram: Boolean(reminder.notify_telegram),
+          telegram_sent_at: null,
+          telegram_locked_at: null,
+          telegram_attempts: 0,
+          telegram_last_error: null,
         }).select().single()
         if (nextError) throw nextError
         setReminders(items => [nextReminder, ...items.map(item => item.id === reminder.id ? data : item)].sort((a,b)=>new Date(a.due_at)-new Date(b.due_at)))
@@ -451,7 +609,14 @@ function Reminders({ user }) {
     try {
       const due = new Date(reminder.due_at)
       due.setMinutes(due.getMinutes() + minutes)
-      const { data, error } = await supabase.from('reminders').update({ due_at: due.toISOString(), completed: false }).eq('id', reminder.id).eq('user_id', user.id).select().single()
+      const { data, error } = await supabase.from('reminders').update({
+        due_at: due.toISOString(),
+        completed: false,
+        telegram_sent_at: null,
+        telegram_locked_at: null,
+        telegram_attempts: 0,
+        telegram_last_error: null,
+      }).eq('id', reminder.id).eq('user_id', user.id).select().single()
       if (error) throw error
       setReminders(items => items.map(item => item.id === reminder.id ? data : item))
     } catch (err) { setError(err.message || 'Unable to snooze reminder.') }
@@ -474,9 +639,20 @@ function Reminders({ user }) {
   return <div className="reminders-page">
     <div className="reminders-toolbar">
       <div><div className="panel-kicker">REMINDERS</div><h2>Everything you don't want to forget.</h2><p>Plan your day, schedule repeats and keep the important things visible.</p></div>
-      <div className="reminders-actions"><button className="secondary-btn" onClick={load}><RefreshCw size={15}/> Refresh</button><button className="primary-btn" onClick={()=>setModal({})}><Plus size={16}/> New reminder</button></div>
+      <div className="reminders-actions">
+        <button className={`telegram-status-btn ${telegramConnected ? 'connected' : ''}`} onClick={()=>{setTelegramModal(true);checkTelegramConnection({silent:true})}}>
+          <MessageCircle size={14}/>
+          <span>{telegramConnected ? `Telegram connected${telegramUsername ? ` · @${telegramUsername.replace(/^@/,'')}` : ''}` : 'Telegram not connected'}</span>
+        </button>
+        <button className="secondary-btn" onClick={load}><RefreshCw size={15}/> Refresh</button>
+        <button className="primary-btn" onClick={()=>setModal({})}><Plus size={16}/> New reminder</button>
+      </div>
     </div>
+
     {error&&<div className="form-error pocket-error">{error}</div>}
+    {telegramError&&<div className="form-error pocket-error">{telegramError}</div>}
+    {telegramNotice&&<div className="telegram-notice">{telegramNotice}</div>}
+
     <div className="reminder-kpis">
       <button className={`reminder-stat ${filter==='pending'?'active':''}`} onClick={()=>setFilter('pending')}><strong>{pendingCount}</strong><span>Pending</span></button>
       <button className={`reminder-stat ${filter==='today'?'active':''}`} onClick={()=>setFilter('today')}><strong>{todayCount}</strong><span>Today</span></button>
@@ -506,7 +682,7 @@ function Reminders({ user }) {
                 <div className="calendar-preview-head"><strong>{day.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})}</strong><span>{previewItems.length ? `${previewItems.length} reminder${previewItems.length===1?'':'s'}` : 'Nothing scheduled'}</span></div>
                 {previewItems.length===0
                   ? <div className="calendar-preview-empty">No reminders</div>
-                  : <div className="calendar-preview-list">{previewItems.slice(0,4).map(item=><div className={`calendar-preview-item ${item.completed?'done':''}`} key={item.id}><i className={`priority-dot ${item.priority||'medium'}`}/><div><strong>{item.title}</strong><span>{formatReminderTime(item.due_at)}{item.completed?' · Done':''}</span></div></div>)}{previewItems.length>4&&<div className="calendar-preview-more">+{previewItems.length-4} more</div>}</div>}
+                  : <div className="calendar-preview-list">{previewItems.slice(0,4).map(item=><div className={`calendar-preview-item ${item.completed?'done':''}`} key={item.id}><i className={`priority-dot ${item.priority||'medium'}`}/><div><strong>{item.title}</strong><span>{formatReminderTime(item.due_at)}{item.completed?' · Done':''}{item.notify_telegram?' · Telegram':''}</span></div></div>)}{previewItems.length>4&&<div className="calendar-preview-more">+{previewItems.length-4} more</div>}</div>}
                 <button type="button" className="calendar-preview-add" onClick={()=>setModal(reminderDraftForDay(day))}><Plus size={13}/> Add reminder</button>
               </div>}
             </div>
@@ -528,7 +704,45 @@ function Reminders({ user }) {
         </section>
       </aside>
     </div>
-    {modal&&<ReminderModal user={user} initial={modal} onClose={()=>setModal(null)} onSaved={saveReminder}/>}
+
+    {telegramModal&&<div className="modal-layer"><div className="modal telegram-modal">
+      <div className="modal-header">
+        <div><div className="panel-kicker">TELEGRAM</div><h3>{telegramConnected ? 'Telegram connected' : 'Connect Telegram'}</h3></div>
+        <button className="icon-btn" onClick={()=>setTelegramModal(false)}><X size={18}/></button>
+      </div>
+
+      {telegramConnected ? (
+        <>
+          <div className="telegram-connected-card">
+            <MessageCircle size={18}/>
+            <div><strong>{telegramUsername ? `Connected as @${telegramUsername.replace(/^@/,'')}` : 'Telegram chat connected'}</strong><span>Telegram reminders can be delivered even when oneVault is closed.</span></div>
+          </div>
+          <div className="telegram-modal-actions">
+            <button className="secondary-btn" onClick={checkTelegramConnection} disabled={telegramBusy}>{telegramBusy?'Checking…':'Check connection'}</button>
+            <button className="secondary-btn" onClick={testTelegram} disabled={telegramBusy}>{telegramBusy?'Working…':'Send test'}</button>
+            <button className="danger-btn secondary-btn" onClick={disconnectTelegram} disabled={telegramBusy}>{telegramBusy?'Disconnecting…':'Disconnect'}</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="telegram-steps">
+            <div><span>1</span><p>Open the oneVault Telegram bot.</p></div>
+            <div><span>2</span><p>Press <strong>Start</strong> in Telegram.</p></div>
+            <div><span>3</span><p>Return here and press <strong>Check connection</strong>.</p></div>
+          </div>
+          {telegramError&&<div className="form-error">{telegramError}</div>}
+          <div className="telegram-modal-actions">
+            <button className="primary-btn" onClick={connectTelegram} disabled={telegramBusy}>{telegramBusy?'Connecting…':'Open Telegram'}</button>
+            <button className="secondary-btn" onClick={checkTelegramConnection} disabled={telegramBusy}>{telegramBusy?'Checking…':'Check connection'}</button>
+          </div>
+          {telegramConnectUrl&&<button className="telegram-reopen-link" onClick={()=>window.open(telegramConnectUrl,'_blank','noopener,noreferrer')}>Open Telegram link again</button>}
+        </>
+      )}
+
+      {telegramNotice&&<div className="telegram-notice">{telegramNotice}</div>}
+    </div></div>}
+
+    {modal&&<ReminderModal user={user} initial={modal} telegramConnected={telegramConnected} onClose={()=>setModal(null)} onSaved={saveReminder}/>}
   </div>
 }
 
@@ -539,7 +753,7 @@ function ReminderRow({ reminder, compact = false, onEdit, onDelete, onToggle, on
     <div className="reminder-main">
       <strong>{reminder.title}</strong>
       {reminder.description&&<small>{reminder.description}</small>}
-      <div className="reminder-meta"><span className={`priority-pill ${reminder.priority||'medium'}`}>{reminder.priority||'medium'}</span>{reminder.repeat_rule&&<span>{reminder.repeat_rule}</span>}<span className={overdue?'overdue-text':''}>{formatReminderDate(reminder.due_at)} · {formatReminderTime(reminder.due_at)}</span></div>
+      <div className="reminder-meta"><span className={`priority-pill ${reminder.priority||'medium'}`}>{reminder.priority||'medium'}</span>{reminder.repeat_rule&&<span>{reminder.repeat_rule}</span>}<span className={overdue?'overdue-text':''}>{formatReminderDate(reminder.due_at)} · {formatReminderTime(reminder.due_at)}</span>{reminder.notify_telegram&&<span className="telegram-badge" title="Telegram delivery"><MessageCircle size={10}/> Telegram</span>}</div>
     </div>
     <div className="reminder-actions">
       {!reminder.completed&&<button className="mini-btn" onClick={()=>onSnooze(reminder,15)} title="Snooze 15 min">+15</button>}
