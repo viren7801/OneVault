@@ -248,6 +248,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .form-error { padding:10px 11px; border-radius:10px; border:1px solid rgba(220,110,110,.18); background:rgba(220,110,110,.07); color:#eca3a3; font-size:10px; line-height:1.5; }
 .modal-layer { position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:20px; background:rgba(0,0,0,.62); backdrop-filter:blur(8px); }
 .modal { width:min(560px,100%); max-height:calc(100vh - 40px); overflow:auto; overscroll-behavior:contain; padding:20px; border-radius:22px; border:1px solid rgba(255,255,255,.09); background:#121216; box-shadow:0 30px 80px rgba(0,0,0,.45); }
+.expense-modal { width:min(500px,100%); }
+
 .modal-header { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:18px; }
 .modal h3 { margin:5px 0 0; font-size:20px; }
 .segmented { display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-bottom:16px; padding:4px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06); }
