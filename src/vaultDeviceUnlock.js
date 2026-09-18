@@ -1,5 +1,3 @@
-import { } from 'lucide-react'
-
 function bytesToBase64Url(bytes) {
   const source = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
   let binary = ''
