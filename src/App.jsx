@@ -488,14 +488,14 @@ function Reminders({ user }) {
             const dateKey = reminderDateKey(day)
             const previewItems = reminders.filter(r => sameCalendarDay(r.due_at, day)).sort((a,b)=>new Date(a.due_at)-new Date(b.due_at))
             const showPreview = hoveredDate === dateKey
-            return <div key={day.toISOString()} className={`calendar-day ${inMonth?'':'muted'} ${sameCalendarDay(day,today)?'today':''} ${selected?'selected':''} ${showPreview?'preview-open':''`} onMouseEnter={()=>setHoveredDate(dateKey)} onMouseLeave={()=>setHoveredDate(null)} onFocus={()=>setHoveredDate(dateKey)} onBlur={()=>setHoveredDate(null)} onClick={()=>setSelectedDate(startOfDay(day))} role="button" tabIndex={0} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setSelectedDate(startOfDay(day))}}}>
+            return <div key={day.toISOString()} className={`calendar-day ${inMonth?'':'muted'} ${sameCalendarDay(day,today)?'today':''} ${selected?'selected':''} ${showPreview?'preview-open':''}`} onMouseEnter={()=>setHoveredDate(dateKey)} onMouseLeave={()=>setHoveredDate(null)} onFocus={()=>setHoveredDate(dateKey)} onBlur={()=>setHoveredDate(null)} onClick={()=>setSelectedDate(startOfDay(day))} role="button" tabIndex={0} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setSelectedDate(startOfDay(day))}}}>
               <span className="calendar-number">{day.getDate()}</span>
-              {dayItems.length>0&&<div className="calendar-dots">{dayItems.slice(0,3).map(item=><i key={item.id} className={`priority-dot ${item.priority||'medium'} ${item.completed?'done':''`}/>)}{dayItems.length>3&&<b>+{dayItems.length-3}</b>}</div>}
+              {dayItems.length>0&&<div className="calendar-dots">{dayItems.slice(0,3).map(item=><i key={item.id} className={`priority-dot ${item.priority||'medium'} ${item.completed?'done':''}`}/>)}{dayItems.length>3&&<b>+{dayItems.length-3}</b>}</div>}
               {showPreview&&<div className="calendar-preview" onClick={e=>e.stopPropagation()}>
                 <div className="calendar-preview-head"><strong>{day.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})}</strong><span>{previewItems.length ? `${previewItems.length} reminder${previewItems.length===1?'':'s'}` : 'Nothing scheduled'}</span></div>
                 {previewItems.length===0
                   ? <div className="calendar-preview-empty">No reminders</div>
-                  : <div className="calendar-preview-list">{previewItems.slice(0,4).map(item=><div className={`calendar-preview-item ${item.completed?'done':''`} key={item.id}><i className={`priority-dot ${item.priority||'medium'}`}/><div><strong>{item.title}</strong><span>{formatReminderTime(item.due_at)}{item.completed?' · Done':''}</span></div></div>)}{previewItems.length>4&&<div className="calendar-preview-more">+{previewItems.length-4} more</div>}</div>}
+                  : <div className="calendar-preview-list">{previewItems.slice(0,4).map(item=><div className={`calendar-preview-item ${item.completed?'done':''}`} key={item.id}><i className={`priority-dot ${item.priority||'medium'}`}/><div><strong>{item.title}</strong><span>{formatReminderTime(item.due_at)}{item.completed?' · Done':''}</span></div></div>)}{previewItems.length>4&&<div className="calendar-preview-more">+{previewItems.length-4} more</div>}</div>}
                 <button type="button" className="calendar-preview-add" onClick={()=>setModal(reminderDraftForDay(day))}><Plus size={13}/> Add reminder</button>
               </div>}
             </div>
