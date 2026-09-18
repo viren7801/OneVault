@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Bell, Check, ChevronRight, CircleDollarSign, CreditCard, Edit3, Filter, MessageCircle,
+  Bell, Check, ChevronRight, CircleDollarSign, CreditCard, Edit3, Filter, Fingerprint, MessageCircle,
   LockKeyhole, LogOut, Menu, NotebookPen, Plus, Search, ShieldCheck,
   Trash2, WalletCards, X, TrendingDown, TrendingUp, PiggyBank, RefreshCw,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import Passwords from './Passwords'
 import Notes from './Notes'
+import PasskeyManager from './PasskeyManager'
 
 const modules = [
   { id: 'pocket', label: 'Pocket', icon: CircleDollarSign, description: 'Expenses, budgets & accounts' },
@@ -26,6 +27,7 @@ function AuthScreen({ onSignedIn }) {
   const [email, setEmail] = useState(import.meta.env.VITE_ALLOWED_EMAIL || '')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
+  const [passkeyBusy, setPasskeyBusy] = useState(false)
   const [error, setError] = useState('')
 
   async function submit(e) {
@@ -33,20 +35,38 @@ function AuthScreen({ onSignedIn }) {
     try {
       const allowed = import.meta.env.VITE_ALLOWED_EMAIL?.trim().toLowerCase()
       if (allowed && email.trim().toLowerCase() !== allowed) throw new Error('This oneVault build is restricted to the owner account.')
-      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
-      if (error) throw error
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+      if (signInError) throw signInError
       onSignedIn(data.user)
     } catch (err) { setError(err.message || 'Unable to sign in.') }
     finally { setBusy(false) }
   }
 
+  async function signInWithDevice() {
+    setPasskeyBusy(true); setError('')
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPasskey()
+      if (signInError) throw signInError
+      const allowed = import.meta.env.VITE_ALLOWED_EMAIL?.trim().toLowerCase()
+      const signedInEmail = data.user?.email?.trim().toLowerCase()
+      if (allowed && signedInEmail !== allowed) {
+        await supabase.auth.signOut({ scope: 'local' })
+        throw new Error('This passkey is not registered to the oneVault owner account.')
+      }
+      onSignedIn(data.user)
+    } catch (err) {
+      setError(err.message || 'Device sign-in failed or was cancelled.')
+    } finally { setPasskeyBusy(false) }
+  }
+
   return <div className="auth-page"><div className="ambient ambient-one"/><div className="ambient ambient-two"/><div className="auth-card">
     <div className="brand-row"><div className="brand-mark">1</div><div><div className="brand-title">oneVault</div><div className="brand-subtitle">Private personal workspace</div></div></div>
     <div className="auth-icon"><ShieldCheck size={24}/></div><div className="panel-kicker">PRIVATE ACCESS</div><h1>Welcome back.</h1><p className="auth-copy">Sign in to your personal oneVault. There is no public registration.</p>
-    <form onSubmit={submit} className="auth-form"><label><span>Email</span><input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username" required/></label><label><span>Password</span><input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" required/></label>{error&&<div className="form-error">{error}</div>}<button className="primary-btn auth-submit" disabled={busy}>{busy?'Signing in…':'Sign in'}</button></form>
-    <div className="auth-footnote"><ShieldCheck size={15}/> Protected by Supabase authentication + row-level security.</div>
+    <button type="button" className="device-login-btn" onClick={()=>void signInWithDevice()} disabled={passkeyBusy||busy}><Fingerprint size={17}/><span>{passkeyBusy?'Waiting for Face ID / fingerprint / Windows Hello…':'Sign in with Face ID / Touch ID / fingerprint'}</span></button>
+    <div className="auth-divider"><span>or use password</span></div>
+    <form onSubmit={submit} className="auth-form"><label><span>Email</span><input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username" required/></label><label><span>Password</span><input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" required/></label>{error&&<div className="form-error">{error}</div>}<button className="primary-btn auth-submit" disabled={busy||passkeyBusy}>{busy?'Signing in…':'Sign in with password'}</button></form>
+    <div className="auth-footnote"><ShieldCheck size={15}/> Passkeys use your device's secure authenticator; password sign-in remains as the fallback.</div>
   </div></div>
-}
 
 function TransactionModal({ user, accounts, initial, onClose, onSaved }) {
   const isEdit = Boolean(initial?.id)
@@ -814,6 +834,7 @@ function App() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [quickAdd, setQuickAdd] = useState(false)
   const [transactionType, setTransactionType] = useState('expense')
+  const [showPasskeyManager, setShowPasskeyManager] = useState(false)
   const activeModule = useMemo(() => modules.find(m => m.id === active), [active])
 
   useEffect(() => {
@@ -826,7 +847,7 @@ function App() {
   if (authLoading) return <div className="loading-screen">Loading oneVault…</div>
   if (!user) return <AuthScreen onSignedIn={setUser}/>
 
-  async function signOut() { await supabase.auth.signOut(); setUser(null) }
+  async function signOut() { await supabase.auth.signOut({ scope: 'local' }); setUser(null) }
   function openTransaction(type = 'expense') { setTransactionType(type); setQuickAdd(false); window.dispatchEvent(new CustomEvent('onevault:open-transaction', { detail: type })) }
   function openReminder() { setQuickAdd(false); window.dispatchEvent(new CustomEvent('onevault:open-reminder')) }
   function openPassword() { setQuickAdd(false); window.dispatchEvent(new CustomEvent('onevault:open-password')) }
@@ -844,13 +865,14 @@ function App() {
   return <div className="app-shell"><div className="ambient ambient-one"/><div className="ambient ambient-two"/>
     <aside className={`sidebar ${mobileOpen?'open':''}`}><div className="brand-row"><div className="brand-mark">1</div><div><div className="brand-title">oneVault</div><div className="brand-subtitle">Personal workspace</div></div><button className="icon-btn mobile-close" onClick={()=>setMobileOpen(false)}><X size={18}/></button></div>
       <nav className="module-nav"><div className="nav-label">YOUR SPACE</div>{modules.map(m=>{const Icon=m.icon;return <button key={m.id} className={`module-btn ${active===m.id?'selected':''}`} onClick={()=>{setActive(m.id);setMobileOpen(false)}}><span className="module-icon"><Icon size={19}/></span><span className="module-copy"><strong>{m.label}</strong><small>{m.description}</small></span><ChevronRight size={15} className="module-arrow"/></button>})}</nav>
-      <div className="sidebar-footer"><div className="privacy-card"><ShieldCheck size={18}/><div><strong>Private mode</strong><span>Owner-only database access.</span></div></div><button className="logout-btn" onClick={signOut}><LogOut size={16}/> Sign out</button></div>
+      <div className="sidebar-footer"><div className="privacy-card"><ShieldCheck size={18}/><div><strong>Private mode</strong><span>Owner-only database access.</span></div></div><button className="device-security-btn" onClick={()=>setShowPasskeyManager(true)}><Fingerprint size={15}/> Device login</button><button className="logout-btn" onClick={signOut}><LogOut size={16}/> Sign out</button></div>
     </aside>
     {mobileOpen&&<button className="backdrop" onClick={()=>setMobileOpen(false)}/>}<main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-btn mobile-menu" onClick={()=>setMobileOpen(true)}><Menu size={20}/></button><div><div className="eyebrow">PRIVATE DASHBOARD</div><h1>{activeModule.label}</h1></div></div><div className="topbar-actions"><button className="primary-btn" onClick={()=>active==='pocket'?openTransaction('expense'):active==='reminders'?openReminder():active==='passwords'?openPassword():active==='notes'?openNote():setQuickAdd(true)}><Plus size={17}/> Quick add</button></div></header>
        <section className="content">{(active==='pocket'||active==='reminders')&&<div className="hero-row"><div><span className="pill"><span className="status-dot"/> Private workspace</span><h2>Everything personal,<br/><span>in one place.</span></h2><p>Expenses, reminders, passwords and notes with one clean interface across your devices.</p></div><div className="date-card"><div className="date-label">TODAY</div><div className="date-value">{new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div><div className="date-helper">{user.email}</div></div></div>}
         {active==='pocket'?<Pocket user={user} onQuickAdd={openTransaction}/>:active==='reminders'?<Reminders user={user}/>:active==='passwords'?<Passwords user={user}/>:active==='notes'?<Notes user={user}/>:<div className="workspace-grid"><section className="panel large-panel"><div className="panel-header"><div><div className="panel-kicker">MODULE</div><h3>{activeModule.label}</h3></div><button className="text-btn" onClick={()=>quickCreate(active)}>Add new <Plus size={15}/></button></div></section></div>}
       </section></main>
     {quickAdd&&<div className="modal-layer"><div className="modal quick-add-modal"><div className="modal-header"><div><div className="panel-kicker">QUICK ADD</div><h3>What do you want to create?</h3><p className="modal-subtle">Choose the workspace item you want to add.</p></div><button className="icon-btn" onClick={()=>setQuickAdd(false)}><X size={18}/></button></div><div className="quick-grid">{modules.map(m=>{const Icon=m.icon;return <button key={m.id} className="quick-option" onClick={()=>quickCreate(m.id)}><span className="module-icon"><Icon size={20}/></span><span><strong>{m.label}</strong><small>{m.description}</small></span><ChevronRight size={15}/></button>})}</div></div></div>}
+    <PasskeyManager open={showPasskeyManager} onClose={()=>setShowPasskeyManager(false)} user={user}/>
   </div>
 }
 export default App
