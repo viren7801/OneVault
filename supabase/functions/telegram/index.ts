@@ -301,7 +301,7 @@ async function callbackQuery(update) {
 
   await telegramRequest("answerCallbackQuery", {
     callback_query_id: callback.id,
-    text: "Reminded again in " + label + ".",
+    text: "✅ Your reminder is scheduled for " + label + " from now.",
   });
 
   if (callback.message.message_id != null) {
@@ -312,7 +312,7 @@ async function callbackQuery(update) {
     await telegramRequest("editMessageText", {
       chat_id: chatId,
       message_id: callback.message.message_id,
-      text: originalText + "\n\n⏱ Snoozed for " + label + "\nNext reminder: " + formatReminderTime(updateResult.data.due_at),
+      text: originalText + "\n\n✅ Reminder scheduled for " + label + " from now.\nNext reminder: " + formatReminderTime(updateResult.data.due_at),
       reply_markup: { inline_keyboard: [] },
     }).catch(function() {});
   }
