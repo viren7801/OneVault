@@ -67,6 +67,7 @@ function AuthScreen({ onSignedIn }) {
     <form onSubmit={submit} className="auth-form"><label><span>Email</span><input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username" required/></label><label><span>Password</span><input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" required/></label>{error&&<div className="form-error">{error}</div>}<button className="primary-btn auth-submit" disabled={busy||passkeyBusy}>{busy?'Signing in…':'Sign in with password'}</button></form>
     <div className="auth-footnote"><ShieldCheck size={15}/> Passkeys use your device's secure authenticator; password sign-in remains as the fallback.</div>
   </div></div>
+}
 
 function TransactionModal({ user, accounts, initial, onClose, onSaved }) {
   const isEdit = Boolean(initial?.id)
