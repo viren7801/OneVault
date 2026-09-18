@@ -720,3 +720,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .module-toolbar-actions .primary-btn{grid-column:1/-1}
   .notes-filter-row{grid-template-columns:1fr}
 }
+
+.workspace-loading{min-height:320px;display:grid;place-items:center;color:#777781;font-size:12px}
+.quick-add-modal{width:min(620px,100%)}
