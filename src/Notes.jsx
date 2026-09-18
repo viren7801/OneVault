@@ -99,6 +99,7 @@ export default function Notes({ user }) {
   const [busy, setBusy] = useState(false)
   const [biometricAvailable, setBiometricAvailable] = useState(false)
   const [biometricBusy, setBiometricBusy] = useState(false)
+  const [biometricRepair, setBiometricRepair] = useState(false)
 
   const [query, setQuery] = useState('')
   const [view, setView] = useState('all')
@@ -303,13 +304,14 @@ export default function Notes({ user }) {
       })
       await unlockFromMaster(password)
     } catch (err) {
-      setError(err.message || 'Device unlock failed.')
+      setBiometricRepair(true)
+      setError('This vault device credential is not available on this production domain. Unlock with your notes password, then re-register Touch ID.')
     } finally {
       setBiometricBusy(false)
     }
   }
 
-  async function enableBiometric() {
+  async function registerBiometric() {
     if (!masterRef.current) return setError('Unlock the notes vault with your password first.')
     setError('')
     setBiometricBusy(true)
@@ -326,12 +328,16 @@ export default function Notes({ user }) {
       const { error: saveError } = await supabase.from('notes_vaults').upsert(row)
       if (saveError) throw saveError
       setMeta(row)
+      setBiometricRepair(false)
+      setError('')
     } catch (err) {
-      setError(err.message || 'Could not enable device unlock.')
+      setError(err.message || 'Could not register device unlock.')
     } finally {
       setBiometricBusy(false)
     }
   }
+
+  async function enableBiometric() { return registerBiometric() }
 
   async function disableBiometric() {
     setError('')
@@ -654,7 +660,7 @@ export default function Notes({ user }) {
       <div><div className="panel-kicker">PRIVATE NOTES</div><h2>Notes that stay organized.</h2><p>{activeCount} active notes · encrypted vault · folders, tags, history and trash.</p></div>
       <div className="module-toolbar-actions">
         <button className="secondary-btn" onClick={()=>void loadVault()}><RefreshCw size={14}/> Refresh</button>
-        {meta?.biometric_credential_id ? <button className="secondary-btn" onClick={()=>void disableBiometric()} disabled={biometricBusy}><Fingerprint size={14}/> {biometricBusy ? 'Updating…' : 'Device unlock on'}</button> : biometricAvailable ? <button className="secondary-btn" onClick={()=>void enableBiometric()} disabled={biometricBusy}><Fingerprint size={14}/> {biometricBusy ? 'Enabling…' : 'Enable device unlock'}</button> : null}
+        {meta?.biometric_credential_id ? <><button className="secondary-btn" onClick={()=>void disableBiometric()} disabled={biometricBusy}><Fingerprint size={14}/> {biometricBusy ? 'Updating…' : 'Device unlock on'}</button>{biometricRepair && masterRef.current ? <button className="secondary-btn" onClick={()=>void registerBiometric()} disabled={biometricBusy}><Fingerprint size={14}/> Re-register device</button> : null}</> : biometricAvailable ? <button className="secondary-btn" onClick={()=>void enableBiometric()} disabled={biometricBusy}><Fingerprint size={14}/> {biometricBusy ? 'Enabling…' : 'Enable device unlock'}</button> : null}
         <button className="secondary-btn" onClick={()=>void changeVaultPassword({ preventDefault() {} })}><KeyRound size={14}/> Change password</button>
         <button className="secondary-btn" onClick={lockVault}><Lock size={14}/> Lock</button>
         <button className="primary-btn" onClick={openNew}><Plus size={15}/> New note</button>
