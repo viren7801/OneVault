@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Archive, Bold, Code2, Copy, FileText, Fingerprint, Folder, FolderPlus,
   Heading2, Italic, List, ListChecks, Pin, PinOff, Plus, Quote, RefreshCw,
-  Search, ShieldCheck, Star, Trash2, Undo2, X, Lock, Eye, EyeOff,
+  Search, ShieldCheck, Star, Trash2, Undo2, X, Lock, KeyRound,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import {
