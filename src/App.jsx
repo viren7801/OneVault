@@ -337,11 +337,23 @@ function ReminderModal({ user, initial, onClose, onSaved, telegramConnected }) {
         payload.telegram_last_error = null
       }
 
+      const reminderId = initial?.id || crypto.randomUUID()
+      const createdAt = initial?.created_at || new Date().toISOString()
+      payload.id = reminderId
+
       const response = isEdit
-        ? await supabase.from('reminders').update(payload).eq('id', initial.id).eq('user_id', user.id).select().single()
-        : await supabase.from('reminders').insert(payload).select().single()
+        ? await supabase.from('reminders').update(payload).eq('id', initial.id).eq('user_id', user.id)
+        : await supabase.from('reminders').insert(payload)
       if (response.error) throw response.error
-      await onSaved(response.data, initial || null)
+
+      const savedReminder = {
+        ...(initial || {}),
+        ...payload,
+        id: reminderId,
+        created_at: createdAt,
+      }
+
+      onSaved(savedReminder, initial || null)
       onClose()
     } catch (err) {
       setError(err.message || 'Unable to save reminder.')
@@ -500,13 +512,13 @@ function Reminders({ user }) {
     }
   }
 
-  async function load() {
-    setLoading(true)
+  async function load({ silent = false } = {}) {
+    if (!silent) setLoading(true)
     setError('')
     const { data, error } = await supabase.from('reminders').select('*').order('due_at', { ascending: true }).limit(1000)
     if (error) setError(error.message)
     setReminders(data || [])
-    setLoading(false)
+    if (!silent) setLoading(false)
   }
 
   useEffect(() => { load() }, [])
@@ -561,6 +573,11 @@ function Reminders({ user }) {
   const upcoming = filtered.filter(r => new Date(r.due_at) >= today).slice().sort((a,b)=>new Date(a.due_at)-new Date(b.due_at)).slice(0, 8)
 
   function saveReminder(data, previous) {
+    if (!data?.id) {
+      void load({ silent: true })
+      return
+    }
+
     setReminders(items => previous
       ? items.map(item => item.id === data.id ? data : item).sort((a,b)=>new Date(a.due_at)-new Date(b.due_at))
       : [...items, data].sort((a,b)=>new Date(a.due_at)-new Date(b.due_at)))
