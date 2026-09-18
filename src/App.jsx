@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bell, Check, ChevronRight, CircleDollarSign, CreditCard, Edit3, Filter,
   LockKeyhole, LogOut, Menu, NotebookPen, Plus, Search, ShieldCheck,
@@ -356,6 +356,7 @@ function Reminders({ user }) {
   const [viewDate, setViewDate] = useState(startOfDay(new Date()))
   const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()))
   const [hoveredDate, setHoveredDate] = useState(null)
+  const hoverVibrationRef = useRef(null)
   const [modal, setModal] = useState(null)
 
   async function load() {
@@ -403,6 +404,16 @@ function Reminders({ user }) {
   })
   const selectedItems = filtered.filter(r => sameCalendarDay(r.due_at, selectedDate)).sort((a,b)=>new Date(a.due_at)-new Date(b.due_at))
   const reminderDraftForDay = (day) => { const due = new Date(day); due.setHours(9, 0, 0, 0); return { due_at: due.toISOString() } }
+  function handleCalendarHover(dateKey) {
+    setHoveredDate(dateKey)
+    if (hoverVibrationRef.current === dateKey) return
+    hoverVibrationRef.current = dateKey
+    try { if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') navigator.vibrate(8) } catch {}
+  }
+  function handleCalendarLeave() {
+    hoverVibrationRef.current = null
+    setHoveredDate(null)
+  }
   const upcoming = filtered.filter(r => new Date(r.due_at) >= today).slice().sort((a,b)=>new Date(a.due_at)-new Date(b.due_at)).slice(0, 8)
 
   function saveReminder(data, previous) {
@@ -488,7 +499,7 @@ function Reminders({ user }) {
             const dateKey = reminderDateKey(day)
             const previewItems = reminders.filter(r => sameCalendarDay(r.due_at, day)).sort((a,b)=>new Date(a.due_at)-new Date(b.due_at))
             const showPreview = hoveredDate === dateKey
-            return <div key={day.toISOString()} className={`calendar-day ${inMonth?'':'muted'} ${sameCalendarDay(day,today)?'today':''} ${selected?'selected':''} ${showPreview?'preview-open':''}`} onMouseEnter={()=>setHoveredDate(dateKey)} onMouseLeave={()=>setHoveredDate(null)} onFocus={()=>setHoveredDate(dateKey)} onBlur={()=>setHoveredDate(null)} onClick={()=>setSelectedDate(startOfDay(day))} role="button" tabIndex={0} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setSelectedDate(startOfDay(day))}}}>
+            return <div key={day.toISOString()} className={`calendar-day ${inMonth?'':'muted'} ${sameCalendarDay(day,today)?'today':''} ${selected?'selected':''} ${showPreview?'preview-open':''}`} onMouseEnter={()=>handleCalendarHover(dateKey)} onMouseLeave={handleCalendarLeave} onFocus={()=>handleCalendarHover(dateKey)} onBlur={handleCalendarLeave} onClick={()=>setSelectedDate(startOfDay(day))} role="button" tabIndex={0} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setSelectedDate(startOfDay(day))}}}>
               <span className="calendar-number">{day.getDate()}</span>
               {dayItems.length>0&&<div className="calendar-dots">{dayItems.slice(0,3).map(item=><i key={item.id} className={`priority-dot ${item.priority||'medium'} ${item.completed?'done':''}`}/>)}{dayItems.length>3&&<b>+{dayItems.length-3}</b>}</div>}
               {showPreview&&<div className="calendar-preview" onClick={e=>e.stopPropagation()}>
