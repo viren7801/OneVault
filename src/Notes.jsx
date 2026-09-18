@@ -365,6 +365,20 @@ export default function Notes({ user }) {
     setHistoryNote(null)
     setPhase('locked')
   }
+  useEffect(() => {
+    const lockOnBackground = () => {
+      if (document.visibilityState === 'hidden' && phase === 'unlocked' && !biometricBusy && !busy) {
+        setError('Notes vault locked after leaving this tab.')
+        lockVault()
+      }
+    }
+    document.addEventListener('visibilitychange', lockOnBackground)
+    window.addEventListener('pagehide', lockOnBackground)
+    return () => {
+      document.removeEventListener('visibilitychange', lockOnBackground)
+      window.removeEventListener('pagehide', lockOnBackground)
+    }
+  }, [phase, biometricBusy, busy])
 
   async function persist(nextNotes) {
     if (!keyRef.current || !meta) throw new Error('Unlock the notes vault first.')
