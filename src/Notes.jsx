@@ -624,8 +624,8 @@ export default function Notes({ user }) {
       {!setup && meta?.biometric_credential_id && biometricAvailable && <button className="device-unlock-btn" onClick={()=>void unlockBiometric()} disabled={biometricBusy}><Fingerprint size={16}/>{biometricBusy ? 'Waiting for device…' : 'Unlock with Face ID / fingerprint / Windows Hello'}</button>}
       {!setup && meta?.biometric_credential_id && biometricAvailable && <div className="vault-divider"><span>or use password</span></div>}
       <form onSubmit={setup ? createVault : unlock} className="vault-gate-form">
-        <label><span>Notes password</span><input type="password" value={master} onChange={e=>setMaster(e.target.value)} placeholder="At least 12 characters" autoFocus/></label>
-        {setup && <label><span>Confirm password</span><input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} placeholder="Repeat the notes password"/></label>}
+        <label><span>Notes password</span><input type="password" autoComplete="current-password" value={master} onChange={e=>setMaster(e.target.value)} placeholder="At least 12 characters" autoFocus/></label>
+        {setup && <label><span>Confirm password</span><input type="password" autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} placeholder="Repeat the notes password"/></label>}
         {error && <div className="form-error">{error}</div>}
         <button className="primary-btn" disabled={busy}>{busy ? 'Working…' : setup ? 'Create secure notes vault' : 'Unlock notes'}</button>
       </form>
