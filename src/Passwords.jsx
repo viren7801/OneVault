@@ -120,6 +120,20 @@ export default function Passwords({user}){
     }catch(err){setError(err.message||'Could not disable device unlock.')}finally{setBiometricBusy(false)}
   }
   function lockVault(){keyRef.current=null;masterRef.current='';setEntries([]);setSelectedId(null);setShowForm(false);setEditing(null);setShowChange(false);setPhase('locked')}
+  useEffect(() => {
+    const lockOnBackground = () => {
+      if (document.visibilityState === 'hidden' && phase === 'unlocked' && !biometricBusy && !busy) {
+        setError('Password vault locked after leaving this tab.')
+        lockVault()
+      }
+    }
+    document.addEventListener('visibilitychange', lockOnBackground)
+    window.addEventListener('pagehide', lockOnBackground)
+    return () => {
+      document.removeEventListener('visibilitychange', lockOnBackground)
+      window.removeEventListener('pagehide', lockOnBackground)
+    }
+  }, [phase, biometricBusy, busy])
   async function persist(next,nextMeta=meta,key=keyRef.current){
     if(!key||!nextMeta)throw new Error('Unlock the password vault first.')
     const encrypted=await encryptEntries(next,key),row={...nextMeta,iv:encrypted.iv,ciphertext:encrypted.ciphertext,updated_at:new Date().toISOString()}
