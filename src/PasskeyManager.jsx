@@ -11,7 +11,7 @@ function deviceHint(name = '') {
   return 'Passkey / device unlock'
 }
 
-export default function PasskeyManager({ open, onClose, user }) {
+export default function PasskeyManager({ open, onClose, user, autoLockMinutes, onAutoLockChange, onLockNow }) {
   const [passkeys, setPasskeys] = useState([])
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -162,8 +162,21 @@ export default function PasskeyManager({ open, onClose, user }) {
       </div>
 
       <div className="device-security-footer">
+        <div className="security-setting-row">
+          <div>
+            <strong>Auto-lock</strong>
+            <span>Sign out this browser after inactivity.</span>
+          </div>
+          <select value={String(autoLockMinutes)} onChange={e=>onAutoLockChange(Number(e.target.value))}>
+            <option value="5">5 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">60 minutes</option>
+            <option value="0">Never</option>
+          </select>
+        </div>
         <span>Your private passkey key stays with your authenticator. oneVault receives only the verification needed to create a Supabase session.</span>
-        <div className="modal-actions">
+        <div className="modal-actions"><button className="secondary-btn" onClick={onLockNow}><Lock size={14}/> Lock now</button>
           <button className="secondary-btn" onClick={onClose}>Done</button>
           <button className="primary-btn" onClick={()=>void addDevice()} disabled={busy}>{busy ? 'Waiting for device…' : 'Add this device'}</button>
         </div>
