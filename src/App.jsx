@@ -5,7 +5,7 @@ import {
   Trash2, WalletCards, X, TrendingDown, TrendingUp, PiggyBank, RefreshCw,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
-import { signInWithNativeAwarePasskey } from './lib/nativePasskeys'
+import { clearNativeSession, persistNativeSession, signInWithNativeAwarePasskey } from './lib/nativePasskeys'
 import Passwords from './Passwords'
 import Notes from './Notes'
 import PasskeyManager from './PasskeyManager'
@@ -40,6 +40,7 @@ function AuthScreen({ onSignedIn }) {
       if (allowed && email.trim().toLowerCase() !== allowed) throw new Error('This oneVault build is restricted to the owner account.')
       const { data, error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
       if (signInError) throw signInError
+      await persistNativeSession(data.session)
       onSignedIn(data.user, true)
     } catch (err) { setError(err.message || 'Unable to sign in.') }
     finally { setBusy(false) }
@@ -852,14 +853,21 @@ function App() {
 
   async function signOut() {
     await supabase.auth.signOut({ scope: 'local' })
+    await clearNativeSession()
+    setUser(null)
+    setShowPasskeyManager(false)
+  }
+
+  async function lockApp() {
+    await supabase.auth.signOut({ scope: 'local' })
     setUser(null)
     setShowPasskeyManager(false)
   }
 
   useEffect(() => {
     let mounted = true
-    supabase.auth.getSession().then(({ data }) => { if (mounted) { setUser(data.session?.user || null); setAuthLoading(false) } })
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => { setUser(session?.user || null); setAuthLoading(false) })
+    supabase.auth.getSession().then(({ data }) => { if (mounted) { void persistNativeSession(data.session); setUser(data.session?.user || null); setAuthLoading(false) } })
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => { if (session) void persistNativeSession(session); setUser(session?.user || null); setAuthLoading(false) })
     return () => { mounted = false; sub.subscription.unsubscribe() }
   }, [])
 
@@ -872,7 +880,7 @@ function App() {
     const interval = window.setInterval(() => {
       if (!autoLockMinutes) return
       if (Date.now() - lastActivityRef.current >= autoLockMinutes * 60 * 1000) {
-        void signOut()
+        void lockApp()
       }
     }, 15000)
     return () => {
@@ -1047,7 +1055,7 @@ function App() {
       user={user}
       autoLockMinutes={autoLockMinutes}
       onAutoLockChange={setAutoLockMinutes}
-      onLockNow={()=>void signOut()}
+      onLockNow={()=>void lockApp()}
     />
   </div>
 }
