@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - main
+    paths:
+      - package.json
+      - package-lock.json
+      - capacitor.config.ts
+      - android/**
+      - ios/**
+      - .github/workflows/generate-native.yml
   workflow_dispatch:
 
 permissions:
@@ -60,10 +67,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          if git status --short | grep -q .; then
-            git add package.json package-lock.json capacitor.config.ts android ios
+          git add package.json package-lock.json capacitor.config.ts android ios
+
+          if git diff --cached --quiet; then
+            echo "No native project changes to commit."
+          else
             git commit -m "chore: generate Capacitor Android and iOS projects [native-generated]"
             git push
-          else
-            echo "No native project changes to commit."
           fi
