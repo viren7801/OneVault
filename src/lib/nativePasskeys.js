@@ -1,109 +1,175 @@
-// Native passkey bridge retained in the final Android base build.
 import { Capacitor } from '@capacitor/core'
 import { supabase } from './supabase'
 
-let nativePasskeysPromise
+const STORAGE_KEY = 'supabase_session'
+let biometricPromise
+let secureStoragePromise
 
-async function getNativePasskeys() {
+async function getBiometricAuth() {
   if (!Capacitor.isNativePlatform()) return null
-  if (!Capacitor.isPluginAvailable('Passkeys')) {
-    throw new Error('Native passkey support is not included in this oneVault build.')
+  if (!biometricPromise) {
+    biometricPromise = import('@aparajita/capacitor-biometric-auth').then(module => module.BiometricAuth)
   }
-  if (!nativePasskeysPromise) {
-    nativePasskeysPromise = import('@capawesome/capacitor-passkeys').then(module => module.Passkeys)
-  }
-  return nativePasskeysPromise
+  return biometricPromise
 }
 
-function normalizeNativeError(error, fallback) {
-  if (error instanceof Error) return error
-  const normalized = new Error(error?.message || fallback)
-  if (error?.code) normalized.code = error.code
-  return normalized
+async function getSecureStorage() {
+  if (!Capacitor.isNativePlatform()) return null
+  if (!secureStoragePromise) {
+    secureStoragePromise = import('@aparajita/capacitor-secure-storage').then(module => module.SecureStorage)
+  }
+  return secureStoragePromise
 }
 
-function withTimeout(promise, message, timeoutMs = 25000) {
-  let timeoutId
-  const timeout = new Promise((_, reject) => {
-    timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs)
-  })
-  return Promise.race([promise, timeout]).finally(() => {
-    if (timeoutId) window.clearTimeout(timeoutId)
-  })
+function error(message, code) {
+  const result = new Error(message)
+  if (code) result.code = code
+  return result
+}
+
+async function checkBiometricAvailability() {
+  const biometricAuth = await getBiometricAuth()
+  if (!biometricAuth) return { isAvailable: false, biometryType: 'web' }
+  return biometricAuth.checkBiometry()
+}
+
+export async function persistNativeSession(session) {
+  if (!Capacitor.isNativePlatform() || !session?.access_token || !session?.refresh_token) return false
+
+  try {
+    const info = await checkBiometricAvailability()
+    if (!info?.isAvailable) return false
+
+    const secureStorage = await getSecureStorage()
+    await secureStorage.set(STORAGE_KEY, {
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    })
+    return true
+  } catch (nativeError) {
+    console.warn('[oneVault] native biometric session was not stored:', nativeError?.message || nativeError)
+    return false
+  }
+}
+
+export async function clearNativeSession() {
+  if (!Capacitor.isNativePlatform()) return
+  try {
+    const secureStorage = await getSecureStorage()
+    await secureStorage.remove(STORAGE_KEY)
+  } catch (nativeError) {
+    console.warn('[oneVault] native biometric session cleanup failed:', nativeError?.message || nativeError)
+  }
 }
 
 export async function registerNativeAwarePasskey() {
-  const nativePasskeys = await getNativePasskeys()
-  if (!nativePasskeys) {
+  if (!Capacitor.isNativePlatform()) {
     return supabase.auth.registerPasskey()
   }
 
   try {
-    const availability = await nativePasskeys.isAvailable()
+    const { data, error: sessionError } = await supabase.auth.getSession()
+    if (sessionError) return { data: null, error: sessionError }
+    if (!data.session) {
+      return { data: null, error: error('Sign in with your password first, then enable device unlock.') }
+    }
+
+    const biometricAuth = await getBiometricAuth()
+    const availability = await biometricAuth.checkBiometry()
     if (!availability?.isAvailable) {
       return {
         data: null,
-        error: new Error('Passkeys are not available on this device. Check that a supported password/passkey provider such as Google Password Manager is enabled.'),
+        error: error(
+          availability?.reason
+            ? 'Biometric unlock is not available: ' + availability.reason
+            : 'Set up a fingerprint, face unlock, or device credential in Android Settings first.',
+          availability?.code,
+        ),
       }
     }
 
-    const { data: options, error: startError } = await supabase.auth.passkey.startRegistration()
-    if (startError) return { data: null, error: startError }
-    if (!options?.challenge_id || !options?.options) {
-      return { data: null, error: new Error('Supabase did not return valid passkey registration options.') }
-    }
-
-    const credential = await withTimeout(
-      nativePasskeys.createPasskey(options.options),
-      'Android passkey provider did not respond. Open Google Password Manager, make sure passkeys are enabled, then try again.',
-    )
-
-    return await supabase.auth.passkey.verifyRegistration({
-      challengeId: options.challenge_id,
-      credential,
+    await biometricAuth.authenticate({
+      reason: 'Confirm you want to use this device to unlock oneVault.',
+      cancelTitle: 'Cancel',
+      allowDeviceCredential: true,
+      androidTitle: 'Enable oneVault device unlock',
+      androidSubtitle: 'Use your fingerprint or device PIN to protect oneVault.',
+      androidConfirmationRequired: false,
     })
-  } catch (error) {
+
+    await persistNativeSession(data.session)
+
+    return { data: { user: data.session.user }, error: null }
+  } catch (nativeError) {
     return {
       data: null,
-      error: normalizeNativeError(error, 'Native passkey registration failed.'),
+      error: error(
+        nativeError?.message || 'Biometric setup was cancelled or failed.',
+        nativeError?.code,
+      ),
     }
   }
 }
 
 export async function signInWithNativeAwarePasskey() {
-  const nativePasskeys = await getNativePasskeys()
-  if (!nativePasskeys) {
+  if (!Capacitor.isNativePlatform()) {
     return supabase.auth.signInWithPasskey()
   }
 
   try {
-    const availability = await nativePasskeys.isAvailable()
-    if (!availability?.isAvailable) {
+    const secureStorage = await getSecureStorage()
+    const savedSession = await secureStorage.get(STORAGE_KEY)
+
+    if (!savedSession?.access_token || !savedSession?.refresh_token) {
       return {
         data: null,
-        error: new Error('Passkeys are not available on this device. Check that a supported password/passkey provider such as Google Password Manager is enabled.'),
+        error: error('Device unlock is not set up yet. Sign in with your password first, then enable device unlock from Security.'),
       }
     }
 
-    const { data: options, error: startError } = await supabase.auth.passkey.startAuthentication()
-    if (startError) return { data: null, error: startError }
-    if (!options?.challenge_id || !options?.options) {
-      return { data: null, error: new Error('Supabase did not return valid passkey sign-in options.') }
+    const biometricAuth = await getBiometricAuth()
+    const availability = await biometricAuth.checkBiometry()
+    if (!availability?.isAvailable) {
+      return {
+        data: null,
+        error: error(
+          availability?.reason
+            ? 'Biometric unlock is unavailable: ' + availability.reason
+            : 'Fingerprint or device unlock is not available on this device.',
+          availability?.code,
+        ),
+      }
     }
 
-    const credential = await withTimeout(
-      nativePasskeys.getPasskey(options.options),
-      'Android passkey provider did not respond. Open Google Password Manager, make sure passkeys are enabled, then try again.',
-    )
-
-    return await supabase.auth.passkey.verifyAuthentication({
-      challengeId: options.challenge_id,
-      credential,
+    await biometricAuth.authenticate({
+      reason: 'Unlock your private oneVault workspace.',
+      cancelTitle: 'Cancel',
+      allowDeviceCredential: true,
+      androidTitle: 'Unlock oneVault',
+      androidSubtitle: 'Use your fingerprint or device PIN.',
+      androidConfirmationRequired: false,
     })
-  } catch (error) {
+
+    const { data, error: setSessionError } = await supabase.auth.setSession({
+      access_token: savedSession.access_token,
+      refresh_token: savedSession.refresh_token,
+    })
+
+    if (setSessionError) {
+      await clearNativeSession()
+      return { data: null, error: setSessionError }
+    }
+
+    await persistNativeSession(data.session)
+
+    return { data, error: null }
+  } catch (nativeError) {
     return {
       data: null,
-      error: normalizeNativeError(error, 'Native passkey sign-in failed.'),
+      error: error(
+        nativeError?.message || 'Biometric unlock failed or was cancelled.',
+        nativeError?.code,
+      ),
     }
   }
 }
