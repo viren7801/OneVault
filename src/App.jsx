@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bell, Check, ChevronRight, CircleDollarSign, CreditCard, Edit3, Filter, Fingerprint, LayoutDashboard, MessageCircle,
-  LockKeyhole, LogOut, Menu, NotebookPen, Plus, Search, ShieldCheck, Command,
+  LockKeyhole, LogOut, Menu, NotebookPen, Plus, Search, ShieldCheck,
   Trash2, WalletCards, X, TrendingDown, TrendingUp, PiggyBank, RefreshCw,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
@@ -998,7 +998,7 @@ function App() {
             ? <div className="command-empty"><Search size={18}/><strong>No matching actions</strong><span>Try Home, Pocket, reminders or security.</span></div>
             : filteredCommandItems.slice(0,8).map(item=>{const Icon=item.icon;return <button key={item.id} className="command-item" onClick={item.run}><span className="command-item-icon"><Icon size={16}/></span><span className="command-item-copy"><strong>{item.label}</strong><small>{item.description}</small></span><ChevronRight size={14}/></button>})}
         </div>
-        <div className="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> Navigate with keyboard when available</span><span><kbd>⌘K</kbd> Toggle</span></div>
+        <div className="command-footer"><span><kbd>ESC</kbd> Close</span><span><kbd>⌘K</kbd> Open or close</span></div>
       </div>
     </div>}
 
