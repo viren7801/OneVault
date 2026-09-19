@@ -1019,6 +1019,27 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .dashboard-footer-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:2px}
 .dashboard-account-strip{display:flex;align-items:center;gap:7px;color:#676771;font-size:8px;min-width:0}
 .dashboard-account-strip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dashboard-activity-card{grid-column:span 2;min-height:176px;cursor:default}
+.dashboard-activity-card:hover{transform:none}
+.dashboard-inline-link{display:inline-flex;align-items:center;gap:3px;border:0;background:transparent;color:#85858f;font-size:9px;font-weight:700;cursor:pointer;padding:5px 0}
+.dashboard-inline-link:hover{color:#fff}
+.dashboard-activity-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:18px}
+.dashboard-activity-heading>div{display:grid;gap:4px}
+.dashboard-activity-heading strong{font-size:13px;color:#e5e5ea}
+.dashboard-activity-heading span{font-size:8px;color:#6e6e78}
+.dashboard-activity-count{width:24px;height:24px;display:grid;place-items:center;border-radius:8px;background:rgba(255,255,255,.045);color:#8d8d98!important;font-size:9px!important}
+.dashboard-activity-list{display:grid;gap:5px;margin-top:10px}
+.dashboard-activity-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:9px;width:100%;padding:7px 0;border:0;background:transparent;text-align:left;color:inherit;cursor:pointer}
+.dashboard-activity-row:hover .dashboard-activity-copy strong{color:#fff}
+.dashboard-activity-dot{width:7px;height:7px;border-radius:50%;background:#b98c8c;box-shadow:0 0 0 4px rgba(185,140,140,.07)}
+.dashboard-activity-dot.income{background:#7fc39b;box-shadow:0 0 0 4px rgba(127,195,155,.07)}
+.dashboard-activity-copy{min-width:0;display:grid;gap:2px}
+.dashboard-activity-copy strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#d9d9df;font-size:9px;font-weight:650}
+.dashboard-activity-copy small{color:#686873;font-size:8px}
+.dashboard-activity-amount{font-size:9px;white-space:nowrap}
+.dashboard-activity-amount.income{color:#8cc9a1}
+.dashboard-activity-amount.expense{color:#c99595}
+
 @media (max-width:1100px){
   .dashboard-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .dashboard-wide-card{grid-column:span 2}
