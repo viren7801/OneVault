@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Check, Fingerprint, KeyRound, Lock, Pencil, ShieldCheck, Trash2, X } from 'lucide-react'
 import { supabase } from './lib/supabase'
+import { registerNativeAwarePasskey } from './lib/nativePasskeys'
 
 function deviceHint(name = '') {
   const value = name.toLowerCase()
@@ -42,7 +43,7 @@ export default function PasskeyManager({ open, onClose, user, autoLockMinutes, o
     setError('')
     setNotice('')
     try {
-      const { error: registerError } = await supabase.auth.registerPasskey()
+      const { error: registerError } = await registerNativeAwarePasskey()
       if (registerError) throw registerError
       await load()
       setNotice('This device is now registered for oneVault sign-in.')
