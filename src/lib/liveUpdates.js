@@ -135,8 +135,7 @@ export async function getLiveUpdateStatus() {
   const nextBundleId = next?.bundleId || null
   const available = Boolean(
     manifest.bundleId &&
-    manifest.bundleId !== currentBundleId &&
-    manifest.bundleId !== nextBundleId,
+    manifest.bundleId !== currentBundleId,
   )
   const staged = Boolean(
     manifest.bundleId &&
