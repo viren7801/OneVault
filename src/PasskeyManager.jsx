@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { Check, Fingerprint, KeyRound, Lock, Pencil, ShieldCheck, Trash2, X } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import { registerNativeAwarePasskey } from './lib/nativePasskeys'
@@ -113,7 +114,7 @@ export default function PasskeyManager({ open, onClose, user, autoLockMinutes, o
         <div>
           <div className="panel-kicker">DEVICE SECURITY</div>
           <h3>Passkeys & trusted devices</h3>
-          <p className="modal-subtle">Sign in with Face ID, Touch ID, fingerprint, Windows Hello or a passkey.</p>
+          <p className="modal-subtle">Use your device biometric or passkey for private oneVault access.</p>
         </div>
         <button className="icon-btn" onClick={onClose}><X size={18}/></button>
       </div>
@@ -179,7 +180,7 @@ export default function PasskeyManager({ open, onClose, user, autoLockMinutes, o
         <span>Your private passkey key stays with your authenticator. oneVault receives only the verification needed to create a Supabase session.</span>
         <div className="modal-actions"><button className="secondary-btn" onClick={onLockNow}><Lock size={14}/> Lock now</button>
           <button className="secondary-btn" onClick={onClose}>Done</button>
-          <button className="primary-btn" onClick={()=>void addDevice()} disabled={busy}>{busy ? 'Waiting for device…' : 'Add this device'}</button>
+          <button className="primary-btn" onClick={()=>void addDevice()} disabled={busy}>{busy ? (Capacitor.isNativePlatform() ? 'Authenticating…' : 'Waiting for device…') : (Capacitor.isNativePlatform() ? 'Enable fingerprint / face unlock' : 'Add this device')}</button>
         </div>
       </div>
     </div>
