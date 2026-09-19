@@ -67,6 +67,9 @@ jobs:
           }
           EOF
           echo "Published live bundle ${GITHUB_SHA} (${CHECKSUM})"
+          rm -rf /tmp/onevault-live-update
+          mkdir -p /tmp/onevault-live-update
+          cp -a public/live-updates/. /tmp/onevault-live-update/
 
       - name: Commit live update metadata
         shell: bash
@@ -88,9 +91,21 @@ jobs:
               exit 0
             fi
 
-            echo "Push raced with another workflow. Rebasing onto the latest main (attempt ${attempt}/5)…"
+            echo "Push raced with another workflow. Resetting to latest main and restoring this live bundle (attempt ${attempt}/5)…"
             git fetch origin main
-            git rebase origin/main
+            git reset --hard origin/main
+            git clean -fd
+            rm -rf public/live-updates
+            mkdir -p public/live-updates
+            cp -a /tmp/onevault-live-update/. public/live-updates/
+            git add public/live-updates
+
+            if git diff --cached --quiet; then
+              echo "Live update metadata disappeared after reset; restoring failed."
+              exit 1
+            fi
+
+            git commit -m "chore: publish live update [live-update-generated]"
 
             if [ "$attempt" -lt 5 ]; then
               sleep $((attempt * 2))
