@@ -17,6 +17,13 @@ const monthStart = () => {
   return new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 }
 
+const dayBounds = () => {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  return { start: start.toISOString(), end: end.toISOString() }
+}
+
 function getReminderLabel(value) {
   const date = new Date(value)
   const now = new Date()
@@ -33,6 +40,7 @@ export default function Dashboard({ user, onNavigate, onQuickAdd, onOpenSecurity
   const [transactions, setTransactions] = useState([])
   const [budgets, setBudgets] = useState([])
   const [reminders, setReminders] = useState([])
+  const [todayReminders, setTodayReminders] = useState([])
   const [passkeys, setPasskeys] = useState(0)
   const [vaultStatus, setVaultStatus] = useState({ passwords: false, notes: false })
 
@@ -42,24 +50,27 @@ export default function Dashboard({ user, onNavigate, onQuickAdd, onOpenSecurity
 
     const start = monthStart()
     const soon = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const today = dayBounds()
 
-    const [tx, ac, bu, rm, pk, pv, nv] = await Promise.all([
+    const [tx, ac, bu, rm, tr, pk, pv, nv] = await Promise.all([
       supabase.from('expenses').select('id,amount,type,category,description,spent_at').eq('user_id', user.id).gte('spent_at', start).order('spent_at', { ascending: false }).limit(50),
       supabase.from('accounts').select('id,name,type,balance').eq('user_id', user.id).order('created_at', { ascending: true }),
       supabase.from('budgets').select('id,category,amount,month').eq('user_id', user.id).eq('month', new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0') + '-01').order('category'),
       supabase.from('reminders').select('id,title,due_at,priority,completed').eq('user_id', user.id).eq('completed', false).gte('due_at', new Date().toISOString()).lte('due_at', soon).order('due_at').limit(5),
+      supabase.from('reminders').select('id,title,due_at,priority,completed').eq('user_id', user.id).eq('completed', false).gte('due_at', today.start).lt('due_at', today.end).order('due_at').limit(8),
       supabase.auth.passkey.list(),
       supabase.from('password_vaults').select('user_id').eq('user_id', user.id).maybeSingle(),
       supabase.from('notes_vaults').select('user_id').eq('user_id', user.id).maybeSingle(),
     ])
 
-    const firstError = tx.error || ac.error || bu.error || rm.error
+    const firstError = tx.error || ac.error || bu.error || rm.error || tr.error
     if (firstError) setError(firstError.message)
 
     setTransactions(tx.data || [])
     setAccounts(ac.data || [])
     setBudgets(bu.data || [])
     setReminders(rm.data || [])
+    setTodayReminders(tr.data || [])
     setPasskeys(pk.error ? 0 : (pk.data || []).length)
     setVaultStatus({
       passwords: Boolean(pv.data),
@@ -98,6 +109,18 @@ export default function Dashboard({ user, onNavigate, onQuickAdd, onOpenSecurity
     return { rows, total, spent, percent: total ? Math.min(100, spent / total * 100) : 0 }
   }, [budgets, transactions])
 
+  const todayStats = useMemo(() => {
+    const now = new Date()
+    const todaysTransactions = transactions.filter(item => new Date(item.spent_at).toDateString() === now.toDateString())
+    const spent = todaysTransactions
+      .filter(item => item.type === 'expense')
+      .reduce((sum, item) => sum + Number(item.amount), 0)
+    const income = todaysTransactions
+      .filter(item => item.type === 'income')
+      .reduce((sum, item) => sum + Number(item.amount), 0)
+    return { spent, income, transactions: todaysTransactions }
+  }, [transactions])
+
   if (loading) return <div className="dashboard-loading"><ShieldCheck size={18}/> Preparing your private overview…</div>
 
   return <div className="dashboard-page">
@@ -112,6 +135,58 @@ export default function Dashboard({ user, onNavigate, onQuickAdd, onOpenSecurity
         <button className="primary-btn" onClick={()=>onQuickAdd()}><Plus size={15}/> Quick add</button>
       </div>
     </div>
+
+    <section className="dashboard-today">
+      <div className="dashboard-today-main">
+        <div className="dashboard-section-head">
+          <div>
+            <div className="panel-kicker">TODAY</div>
+            <h3>{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
+          </div>
+          <span className="dashboard-today-count">{todayReminders.length} reminder{todayReminders.length === 1 ? '' : 's'}</span>
+        </div>
+
+        <div className="dashboard-today-list">
+          {todayReminders.length === 0
+            ? <div className="dashboard-today-empty">
+                <div className="dashboard-today-empty-icon"><Bell size={16}/></div>
+                <div><strong>Your day is clear.</strong><span>No pending reminders for today.</span></div>
+              </div>
+            : todayReminders.slice(0, 4).map(item => (
+                <button key={item.id} className="dashboard-today-reminder" onClick={()=>onNavigate('reminders')}>
+                  <span className={`dashboard-reminder-priority ${item.priority || 'medium'}`}></span>
+                  <span className="dashboard-today-reminder-copy">
+                    <strong>{item.title}</strong>
+                    <small>{getReminderLabel(item.due_at)} · {item.priority || 'medium'} priority</small>
+                  </span>
+                  <ChevronRight size={14}/>
+                </button>
+              ))}
+        </div>
+      </div>
+
+      <div className="dashboard-today-side">
+        <div className="dashboard-section-head compact">
+          <div>
+            <div className="panel-kicker">QUICK VIEW</div>
+            <h3>Make it happen.</h3>
+          </div>
+          <CalendarClock size={17}/>
+        </div>
+
+        <div className="dashboard-today-metrics">
+          <div><span>Spent today</span><strong>{money(todayStats.spent)}</strong></div>
+          <div><span>Received today</span><strong>{money(todayStats.income)}</strong></div>
+        </div>
+
+        <div className="dashboard-quick-actions">
+          <button onClick={()=>onQuickAdd()}><Plus size={13}/> Quick add</button>
+          <button onClick={()=>onNavigate('reminders')}><Bell size={13}/> Reminders</button>
+          <button onClick={()=>onNavigate('notes')}><NotebookPen size={13}/> Notes</button>
+          <button onClick={()=>onNavigate('passwords')}><LockKeyhole size={13}/> Passwords</button>
+        </div>
+      </div>
+    </section>
 
     {error && <div className="form-error">{error}</div>}
 
