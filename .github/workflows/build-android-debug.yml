@@ -1,4 +1,8 @@
 name: Build Android Debug APK
+concurrency:
+  group: onevault-main-publisher
+  cancel-in-progress: false
+
 # Final native base build: Update Center is included in the web layer.
 
 on:
