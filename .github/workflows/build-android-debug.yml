@@ -11,6 +11,9 @@ on:
       - capacitor.config.ts
       - android/**
       - src/lib/nativePasskeys.js
+      - src/lib/liveUpdates.js
+      - src/UpdateCenter.jsx
+      - src/updateCenter.css
       - .github/workflows/build-android-debug.yml
   workflow_dispatch:
 
