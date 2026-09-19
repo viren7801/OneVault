@@ -13,7 +13,8 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.5.2"),
         .package(name: "CapawesomeCapacitorLiveUpdate", path: "../../../node_modules/@capawesome/capacitor-live-update"),
-        .package(name: "CapawesomeCapacitorPasskeys", path: "../../../node_modules/@capawesome/capacitor-passkeys")
+        .package(name: "AparajitaCapacitorBiometricAuth", path: "../../../node_modules/@aparajita/capacitor-biometric-auth"),
+        .package(name: "AparajitaCapacitorSecureStorage", path: "../../../node_modules/@aparajita/capacitor-secure-storage")
     ],
     targets: [
         .target(
@@ -22,7 +23,8 @@ let package = Package(
                 .product(name: "Capacitor", package: "capacitor-swift-pm"),
                 .product(name: "Cordova", package: "capacitor-swift-pm"),
                 .product(name: "CapawesomeCapacitorLiveUpdate", package: "CapawesomeCapacitorLiveUpdate"),
-                .product(name: "CapawesomeCapacitorPasskeys", package: "CapawesomeCapacitorPasskeys")
+                .product(name: "AparajitaCapacitorBiometricAuth", package: "AparajitaCapacitorBiometricAuth"),
+                .product(name: "AparajitaCapacitorSecureStorage", package: "AparajitaCapacitorSecureStorage")
             ]
         )
     ]
