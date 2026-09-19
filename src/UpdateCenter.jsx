@@ -29,7 +29,9 @@ export default function UpdateCenter() {
       setLatest(status)
       if (status.available) {
         setState('available')
-        setMessage('A new oneVault update is ready to install.')
+        setMessage(status.staged
+          ? 'The latest update is already downloaded. Tap Update now to apply it.'
+          : 'A new oneVault update is ready to install.')
       } else {
         setState('current')
         setMessage('You are already using the latest app update.')
