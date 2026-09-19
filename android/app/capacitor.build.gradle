@@ -10,10 +10,11 @@ android {
 apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle"
 dependencies {
     implementation project(':capawesome-capacitor-live-update')
-    implementation project(':capawesome-capacitor-passkeys')
-
+    implementation project(':aparajita-capacitor-biometric-auth')
+    implementation project(':aparajita-capacitor-secure-storage')
+    implementation project(':capacitor-app')
+    implementation project(':capacitor-keyboard')
 }
-
 
 if (hasProperty('postBuildExtras')) {
   postBuildExtras()
