@@ -868,38 +868,61 @@ function App() {
 
   useEffect(() => {
     let mounted = true
+    let authEventDuringBootstrap = false
 
-    async function bootstrapAuth() {
-      const { data } = await supabase.auth.getSession()
+    // Register the listener before getSession() so a fast password/biometric
+    // sign-in cannot be overwritten by a slower bootstrap call returning null.
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return
 
+      authEventDuringBootstrap = true
+
       if (Capacitor.isNativePlatform()) {
-        // Keep the protected native session in secure storage, but always open
-        // the Android/iOS app behind the device authentication screen.
-        if (data.session) {
-          await persistNativeSession(data.session)
-          await supabase.auth.signOut({ scope: 'local' })
+        if (session) {
+          // Keep the secure native session synchronized, but do not make the
+          // UI wait for secure-storage I/O.
+          void persistNativeSession(session)
+          setUser(session.user)
+        } else {
+          setUser(null)
         }
-        setUser(null)
       } else {
-        setUser(data.session?.user || null)
+        setUser(session?.user || null)
       }
 
       setAuthLoading(false)
+    })
+
+    async function bootstrapAuth() {
+      try {
+        const { data, error } = await supabase.auth.getSession()
+        if (!mounted) return
+
+        // An auth event already won the race. Never overwrite it with the
+        // snapshot returned by getSession().
+        if (authEventDuringBootstrap) return
+
+        if (Capacitor.isNativePlatform()) {
+          // A JavaScript session can be left over from the previous webview
+          // lifetime. Move it to secure storage and clear it so the native
+          // login screen always requires device authentication.
+          if (!error && data.session) {
+            await persistNativeSession(data.session)
+            if (mounted) await supabase.auth.signOut({ scope: 'local' })
+          }
+          if (mounted) setUser(null)
+        } else {
+          setUser(data.session?.user || null)
+        }
+      } catch (bootstrapError) {
+        console.warn('[OneVault] auth bootstrap failed:', bootstrapError?.message || bootstrapError)
+        if (mounted) setUser(null)
+      } finally {
+        if (mounted) setAuthLoading(false)
+      }
     }
 
     void bootstrapAuth()
-
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (Capacitor.isNativePlatform() && !session) {
-        setUser(null)
-        setAuthLoading(false)
-        return
-      }
-      if (session) void persistNativeSession(session)
-      setUser(session?.user || null)
-      setAuthLoading(false)
-    })
 
     return () => {
       mounted = false
