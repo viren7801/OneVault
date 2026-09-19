@@ -10,7 +10,7 @@ const config: CapacitorConfig = {
   },
   plugins: {
     LiveUpdate: {
-      autoUpdateStrategy: 'none',
+      autoUpdateStrategy: 'background',
       autoBlockRolledBackBundles: true,
       readyTimeout: 10000,
     },
