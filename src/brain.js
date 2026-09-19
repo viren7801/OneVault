@@ -31,7 +31,7 @@ function rankTransaction(row, query) {
     row.account,
     row.type,
   ].join(' '))
-  const terms = normalizeText(query).split(/\\s+/).filter(Boolean)
+  const terms = normalizeText(query).split(/\s+/).filter(Boolean)
   return terms.reduce((score, term) => score + (haystack.includes(term) ? 2 : 0), 0)
 }
 
