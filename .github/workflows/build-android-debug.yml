@@ -64,6 +64,19 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
+      - name: Publish APK release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: android
+        run: |
+          set -euo pipefail
+          TAG="android-${GITHUB_SHA::12}"
+          gh release create "${TAG}" app/build/outputs/apk/debug/app-debug.apk \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "OneVault Android ${TAG}" \
+            --notes "OneVault Android debug APK for commit ${GITHUB_SHA}." \
+            --prerelease
+
       - name: Read debug signing certificate
         id: signing
         working-directory: android
