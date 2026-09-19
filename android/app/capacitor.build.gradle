@@ -12,6 +12,7 @@ dependencies {
     implementation project(':capawesome-capacitor-live-update')
     implementation project(':aparajita-capacitor-biometric-auth')
     implementation project(':aparajita-capacitor-secure-storage')
+    implementation project(':capacitor-local-notifications')
 
 }
 
