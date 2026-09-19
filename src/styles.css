@@ -1483,3 +1483,216 @@ body{overscroll-behavior-x:none}
     padding-right: 2px;
   }
 }
+
+
+/* --- Mobile scrolling + Apple-inspired motion --- */
+@keyframes oneVaultSpringIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes oneVaultSoftFloat {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@media (max-width:760px) {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  body {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: auto;
+  }
+
+  .app-shell {
+    min-height: 100dvh;
+    height: auto;
+    overflow: visible !important;
+  }
+
+  .main-area {
+    min-height: 100dvh;
+    height: auto;
+    overflow: visible !important;
+  }
+
+  .content {
+    min-height: calc(100dvh - 70px);
+    height: auto;
+    overflow: visible !important;
+  }
+
+  .pocket-page,
+  .reminders-page,
+  .passwords-page,
+  .notes-page {
+    height: auto;
+    min-height: 0;
+    overflow: visible !important;
+  }
+
+  /* Avoid nested scroll traps on touch devices. */
+  .pocket-page .transaction-table,
+  .pocket-page .account-list,
+  .pocket-page .budget-list,
+  .reminders-page .reminder-list,
+  .passwords-page .password-list,
+  .passwords-page .password-detail,
+  .notes-page .note-list,
+  .notes-page .note-detail {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .pocket-page .transactions-panel,
+  .pocket-page .pocket-side,
+  .reminders-page .calendar-panel,
+  .reminders-page .reminders-side,
+  .passwords-page .password-list-panel,
+  .passwords-page .password-detail-panel,
+  .notes-page .notes-list-panel,
+  .notes-page .note-editor-panel {
+    overflow: visible;
+  }
+
+  /* Native-feeling touch scrolling for long lists when a component needs an inner list. */
+  .pocket-page .category-bars,
+  .reminders-page .calendar-preview,
+  .passwords-page .password-detail,
+  .notes-page .note-preview,
+  .notes-page .history-list {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .pocket-page .panel,
+  .reminders-page .panel,
+  .passwords-page .panel,
+  .notes-page .panel {
+    animation: oneVaultSpringIn .42s cubic-bezier(.22,1,.36,1) both;
+  }
+
+  .pocket-page .panel:nth-child(2),
+  .reminders-page .panel:nth-child(2),
+  .passwords-page .panel:nth-child(2),
+  .notes-page .panel:nth-child(2) {
+    animation-delay: .045s;
+  }
+
+  .pocket-page .panel:nth-child(3),
+  .reminders-page .panel:nth-child(3),
+  .passwords-page .panel:nth-child(3),
+  .notes-page .panel:nth-child(3) {
+    animation-delay: .09s;
+  }
+
+  .money-card,
+  .reminder-stat,
+  .dashboard-card,
+  .quick-option,
+  .password-row,
+  .note-list-row,
+  .reminder-row,
+  .tx-row {
+    transition:
+      transform .28s cubic-bezier(.22,1,.36,1),
+      background-color .22s ease,
+      border-color .22s ease,
+      box-shadow .28s cubic-bezier(.22,1,.36,1);
+    will-change: transform;
+  }
+
+  .money-card:active,
+  .reminder-stat:active,
+  .dashboard-card:active,
+  .quick-option:active,
+  .password-row:active,
+  .note-list-row:active,
+  .reminder-row:active,
+  .tx-row:active,
+  .icon-btn:active,
+  .primary-btn:active,
+  .secondary-btn:active {
+    transform: scale(.985);
+  }
+
+  .money-card,
+  .reminder-stat,
+  .dashboard-card {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.022));
+    box-shadow:
+      0 10px 30px rgba(0,0,0,.12),
+      inset 0 1px 0 rgba(255,255,255,.035);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
+  .mobile-bottom-nav {
+    box-shadow:
+      0 18px 55px rgba(0,0,0,.42),
+      inset 0 1px 0 rgba(255,255,255,.045);
+    background: rgba(18,18,22,.78);
+  }
+
+  .mobile-bottom-item {
+    transition:
+      transform .25s cubic-bezier(.22,1,.36,1),
+      background-color .2s ease,
+      color .2s ease;
+  }
+
+  .mobile-bottom-item.selected {
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.05),
+      0 6px 18px rgba(0,0,0,.15);
+  }
+
+  .mobile-bottom-item:active {
+    transform: scale(.94);
+  }
+
+  .calendar-day,
+  .onevault-update-pill,
+  .command-trigger {
+    transition:
+      transform .25s cubic-bezier(.22,1,.36,1),
+      background-color .2s ease,
+      border-color .2s ease;
+  }
+
+  .calendar-day:active,
+  .onevault-update-pill:active,
+  .command-trigger:active {
+    transform: scale(.985);
+  }
+
+  .bar-fill,
+  .category-fill,
+  .budget-fill,
+  .dashboard-progress i {
+    transition: width .55s cubic-bezier(.22,1,.36,1), height .55s cubic-bezier(.22,1,.36,1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pocket-page .panel,
+  .reminders-page .panel,
+  .passwords-page .panel,
+  .notes-page .panel {
+    animation: none !important;
+  }
+}
