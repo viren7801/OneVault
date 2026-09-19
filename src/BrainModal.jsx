@@ -88,7 +88,7 @@ export default function BrainModal({ user, onClose }) {
             <button
               type="button"
               className={mode === 'quick' ? 'active' : ''}
-              onClick={() => setMode('quick')}
+              onClick={() => { setMode('quick'); setAnswer(''); setSources([]); setError('') }}
               role="tab"
               aria-selected={mode === 'quick'}
             >
@@ -98,7 +98,7 @@ export default function BrainModal({ user, onClose }) {
             <button
               type="button"
               className={mode === 'claude' ? 'active' : ''}
-              onClick={() => setMode('claude')}
+              onClick={() => { setMode('claude'); setAnswer(''); setSources([]); setError('') }}
               role="tab"
               aria-selected={mode === 'claude'}
             >
@@ -152,7 +152,7 @@ export default function BrainModal({ user, onClose }) {
         {answer && (
           <div className="brain-answer">
             <div className="brain-answer-head">
-              <div><div className="panel-kicker">ANSWER</div><h4>Your OneVault context</h4></div>
+              <div><div className="panel-kicker">{mode === 'claude' ? 'CLAUDE ANSWER' : 'QUICK ANSWER'}</div><h4>Your OneVault context</h4></div>
               <button className="text-btn" type="button" onClick={() => { setAnswer(''); setSources([]); setError(''); setQuestion(''); window.setTimeout(() => inputRef.current?.focus(), 0) }}>
                 Ask another
               </button>
