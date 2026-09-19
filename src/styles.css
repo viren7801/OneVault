@@ -3075,3 +3075,178 @@ body{overscroll-behavior-x:none}
     text-align: left;
   }
 }
+
+
+/* --- Safe Liquid Glass pass: functional chrome only --- */
+:root {
+  --glass-border: rgba(255,255,255,.13);
+  --glass-border-soft: rgba(255,255,255,.08);
+  --glass-surface: rgba(255,255,255,.045);
+  --glass-surface-strong: rgba(255,255,255,.075);
+  --glass-highlight: rgba(255,255,255,.16);
+  --glass-shadow: 0 14px 40px rgba(0,0,0,.18);
+  --glass-blur: 20px;
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .sidebar,
+  .topbar,
+  .modal,
+  .brain-modal,
+  .auth-card {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.022)),
+      rgba(16,16,20,.62);
+    border-color: var(--glass-border);
+    box-shadow:
+      inset 0 1px 0 var(--glass-highlight),
+      inset 0 -1px 0 rgba(0,0,0,.24),
+      var(--glass-shadow);
+    backdrop-filter: blur(var(--glass-blur)) saturate(145%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(145%);
+  }
+}
+
+.sidebar,
+.topbar,
+.modal,
+.brain-modal,
+.auth-card {
+  border-color: var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.10),
+    inset 0 -1px 0 rgba(0,0,0,.20),
+    0 14px 40px rgba(0,0,0,.16);
+}
+
+.sidebar {
+  border-right-color: var(--glass-border);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+    rgba(13,13,16,.78);
+}
+
+.topbar {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.065), rgba(255,255,255,.018)),
+    rgba(11,11,13,.48);
+}
+
+.icon-btn,
+.secondary-btn,
+.brain-topbar-btn,
+.onevault-update-pill,
+.module-btn.selected {
+  border-color: var(--glass-border-soft);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.018)),
+    rgba(255,255,255,.028);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.12),
+    inset 0 -1px 0 rgba(0,0,0,.18);
+}
+
+.icon-btn:hover,
+.secondary-btn:hover,
+.brain-topbar-btn:hover,
+.onevault-update-pill:hover,
+.module-btn:hover,
+.module-btn.selected {
+  border-color: rgba(255,255,255,.16);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.03)),
+    rgba(255,255,255,.035);
+}
+
+.module-btn.selected {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.15),
+    inset 0 -1px 0 rgba(0,0,0,.16),
+    0 8px 22px rgba(0,0,0,.10);
+}
+
+.module-icon,
+.brain-icon,
+.brain-thinking-icon,
+.empty-icon {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.02)),
+    rgba(255,255,255,.035);
+  border: 1px solid rgba(255,255,255,.07);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.10);
+}
+
+.brain-query,
+.brain-mode-toggle {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02)),
+    rgba(255,255,255,.025);
+  border-color: var(--glass-border-soft);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.10),
+    inset 0 -1px 0 rgba(0,0,0,.16);
+}
+
+.brain-mode-toggle button.active,
+.segmented button.active,
+.filter-tabs button.active {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.13), rgba(255,255,255,.045)),
+    rgba(255,255,255,.04);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.13),
+    inset 0 -1px 0 rgba(0,0,0,.16);
+}
+
+.modal-layer {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(112,71,255,.08), transparent 44%),
+    rgba(0,0,0,.62);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .modal-layer {
+    backdrop-filter: blur(12px) saturate(115%);
+    -webkit-backdrop-filter: blur(12px) saturate(115%);
+  }
+}
+
+.primary-btn {
+  border: 1px solid rgba(255,255,255,.20);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.92),
+    inset 0 -1px 0 rgba(0,0,0,.15),
+    0 10px 26px rgba(0,0,0,.16);
+}
+
+.primary-btn:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.98),
+    inset 0 -1px 0 rgba(0,0,0,.16),
+    0 14px 30px rgba(0,0,0,.20);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .sidebar,
+  .topbar,
+  .modal,
+  .brain-modal,
+  .auth-card,
+  .modal-layer {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+@media (max-width:760px) {
+  .sidebar {
+    box-shadow: 16px 0 46px rgba(0,0,0,.28);
+  }
+
+  .topbar {
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.10),
+      0 10px 30px rgba(0,0,0,.12);
+  }
+}
