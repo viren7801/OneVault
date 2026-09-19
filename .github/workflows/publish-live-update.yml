@@ -1,0 +1,76 @@
+name: Publish OneVault Live Update
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - package.json
+      - package-lock.json
+      - capacitor.config.ts
+      - android/**
+      - ios/**
+      - public/live-updates/**
+      - public/.well-known/**
+      - .github/workflows/publish-live-update.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: ${{ !contains(github.event.head_commit.message, '[live-update-generated]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VITE_SUPABASE_URL: "https://gskxfpuotdynbeokruhj.supabase.co"
+      VITE_SUPABASE_PUBLISHABLE_KEY: "${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build web bundle
+        run: npm run build
+
+      - name: Package live update
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf public/live-updates
+          mkdir -p public/live-updates
+          (
+            cd dist
+            zip -qr "../public/live-updates/latest.zip" .
+          )
+          CHECKSUM="$(sha256sum public/live-updates/latest.zip | awk '{print $1}')"
+          cat > public/live-updates/latest.json <<EOF
+          {
+            "bundleId": "${GITHUB_SHA}",
+            "url": "https://onevault.patelviren.com/live-updates/latest.zip",
+            "checksum": "${CHECKSUM}"
+          }
+          EOF
+          echo "Published live bundle ${GITHUB_SHA} (${CHECKSUM})"
+
+      - name: Commit live update metadata
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/live-updates
+          if git diff --cached --quiet; then
+            echo "No live update changes."
+            exit 0
+          fi
+          git commit -m "chore: publish live update [live-update-generated]"
+          git push
