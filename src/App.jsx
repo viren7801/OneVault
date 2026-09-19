@@ -947,6 +947,14 @@ function App() {
   }, [])
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('quickAdd') === '1') {
+      setQuickAdd(true)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+
+  useEffect(() => {
     const setOnline = () => setIsOnline(true)
     const setOffline = () => setIsOnline(false)
     window.addEventListener('online', setOnline)
@@ -1004,7 +1012,17 @@ function App() {
     {mobileOpen&&<button className="backdrop" onClick={()=>setMobileOpen(false)}/>}<main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-btn mobile-menu" onClick={()=>setMobileOpen(true)}><Menu size={20}/></button><div><div className="eyebrow">PRIVATE DASHBOARD</div><h1>{activeModule.label}</h1></div></div><div className="topbar-actions"><span className={`network-status ${isOnline?'online':'offline'}`} title={isOnline?'Online':'Offline'}><span className="network-dot"/><span>{isOnline?'Online':'Offline'}</span></span><button className="command-trigger" onClick={()=>setCommandOpen(true)} title="Command palette"><Search size={15}/><span>Search</span><kbd>⌘K</kbd></button><button className="primary-btn" onClick={()=>active==='pocket'?openTransaction('expense'):active==='reminders'?openReminder():active==='passwords'?openPassword():active==='notes'?openNote():setQuickAdd(true)}><Plus size={17}/> Quick add</button></div></header>
        <section className="content">{(active==='pocket'||active==='reminders')&&<div className="hero-row"><div><span className="pill"><span className="status-dot"/> Private workspace</span><h2>Everything personal,<br/><span>in one place.</span></h2><p>Expenses, reminders, passwords and notes with one clean interface across your devices.</p></div><div className="date-card"><div className="date-label">TODAY</div><div className="date-value">{new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div><div className="date-helper">{user.email}</div></div></div>}
         {active==='home'?<Dashboard user={user} onNavigate={moduleId=>{setActive(moduleId);setMobileOpen(false)}} onQuickAdd={()=>setQuickAdd(true)} onOpenSecurity={()=>setShowPasskeyManager(true)} autoLockMinutes={autoLockMinutes}/>:active==='pocket'?<Pocket user={user} onQuickAdd={openTransaction}/>:active==='reminders'?<Reminders user={user}/>:active==='passwords'?<Passwords user={user}/>:active==='notes'?<Notes user={user}/>:<div className="workspace-grid"><section className="panel large-panel"><div className="panel-header"><div><div className="panel-kicker">MODULE</div><h3>{activeModule.label}</h3></div><button className="text-btn" onClick={()=>quickCreate(active)}>Add new <Plus size={15}/></button></div></section></div>}
-      </section></main>
+      </section>
+      <nav className="mobile-bottom-nav" aria-label="Primary navigation">
+        {modules.map(module => {
+          const Icon = module.icon
+          return <button key={module.id} className={`mobile-bottom-item ${active===module.id?'selected':''}`} onClick={()=>{setActive(module.id);setMobileOpen(false)}}>
+            <Icon size={18}/>
+            <span>{module.label}</span>
+          </button>
+        })}
+      </nav>
+    </main>
     {quickAdd&&<div className="modal-layer"><div className="modal quick-add-modal"><div className="modal-header"><div><div className="panel-kicker">QUICK ADD</div><h3>What do you want to create?</h3><p className="modal-subtle">Choose the workspace item you want to add.</p></div><button className="icon-btn" onClick={()=>setQuickAdd(false)}><X size={18}/></button></div><div className="quick-grid">{modules.filter(m=>m.id!=='home').map(m=>{const Icon=m.icon;return <button key={m.id} className="quick-option" onClick={()=>quickCreate(m.id)}><span className="module-icon"><Icon size={20}/></span><span><strong>{m.label}</strong><small>{m.description}</small></span><ChevronRight size={15}/></button>})}</div></div></div>}
     {commandOpen&&<div className="modal-layer command-layer" onMouseDown={()=>setCommandOpen(false)}>
       <div className="command-palette" onMouseDown={event=>event.stopPropagation()}>
