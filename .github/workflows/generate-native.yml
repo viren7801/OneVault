@@ -1,0 +1,69 @@
+name: Generate Native Apps
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    if: ${{ !contains(github.event.head_commit.message, '[native-generated]') }}
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Add Android platform
+        run: |
+          if [ ! -d android ]; then
+            npx cap add android
+          fi
+
+      - name: Add iOS platform
+        run: |
+          if [ ! -d ios ]; then
+            npx cap add ios
+          fi
+
+      - name: Sync Capacitor
+        run: npx cap sync
+
+      - name: Verify native projects
+        run: |
+          test -f android/settings.gradle
+          test -f ios/App/App.xcodeproj/project.pbxproj
+          test -f capacitor.config.ts
+          npx cap doctor
+
+      - name: Commit generated native projects
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git status --short | grep -q .; then
+            git add package.json package-lock.json capacitor.config.ts android ios
+            git commit -m "chore: generate Capacitor Android and iOS projects [native-generated]"
+            git push
+          else
+            echo "No native project changes to commit."
+          fi
