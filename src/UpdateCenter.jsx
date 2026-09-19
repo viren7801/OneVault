@@ -83,12 +83,13 @@ export default function UpdateCenter() {
         <header className="update-center-header">
           <div>
             <div className="update-center-kicker"><Zap size={13} /> ONEVAULT UPDATE CENTER</div>
-            <h3>Keep OneVault current</h3>
-            <p>Normal app features can be delivered directly to this installed app without another APK.</p>
+            <h3>OneVault live updates are active</h3>
+            <p>Live UI updates are enabled. This message is being delivered from the update server.</p>
           </div>
           <button className="update-center-close" onClick={() => setOpen(false)} aria-label="Close"><X size={17} /></button>
         </header>
 
+        <div className="update-center-live-badge"><span className="update-live-dot" /> LIVE UPDATE TEST</div>
         <div className="update-center-status">
           <div className="update-center-icon">
             {state === 'current' ? <Check size={20} /> : <RefreshCw size={20} className={state === 'checking' || state === 'downloading' ? 'update-spin' : ''} />}
