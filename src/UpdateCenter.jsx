@@ -17,7 +17,19 @@ export default function UpdateCenter() {
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
+
+    let cancelled = false
     void initializeLiveUpdates()
+      .then(() => {
+        if (!cancelled) void check()
+      })
+      .catch(() => {
+        if (!cancelled) void check()
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   if (!Capacitor.isNativePlatform()) return null
