@@ -26,6 +26,7 @@ jobs:
     env:
       VITE_SUPABASE_URL: "https://gskxfpuotdynbeokruhj.supabase.co"
       VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_CrOQDv7o5DNUBiw0PKZhPg_aq8H9eTD"
+      VITE_BUILD_ID: ${{ github.sha }}
 
     steps:
       - name: Checkout
