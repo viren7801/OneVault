@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { Check, Fingerprint, KeyRound, Lock, Pencil, ShieldCheck, Trash2, X } from 'lucide-react'
 import { supabase } from './lib/supabase'
-import { registerNativeAwarePasskey } from './lib/nativePasskeys'
+import { clearNativeSession, getNativeDeviceStatus, registerNativeAwarePasskey, renameNativeDevice } from './lib/nativePasskeys'
 
 function deviceHint(name = '') {
   const value = name.toLowerCase()
@@ -27,9 +27,19 @@ export default function PasskeyManager({ open, onClose, user, autoLockMinutes, o
     setLoading(true)
     setError('')
     try {
-      const { data, error: listError } = await supabase.auth.passkey.list()
-      if (listError) throw listError
-      setPasskeys(data || [])
+      if (Capacitor.isNativePlatform()) {
+        const status = await getNativeDeviceStatus()
+        setPasskeys(status.registered ? [{
+          id: '__native_device__',
+          friendly_name: status.deviceName,
+          created_at: null,
+          native: true,
+        }] : [])
+      } else {
+        const { data, error: listError } = await supabase.auth.passkey.list()
+        if (listError) throw listError
+        setPasskeys(data || [])
+      }
     } catch (err) {
       setError(err.message || 'Could not load your device passkeys.')
     } finally {
@@ -89,14 +99,18 @@ export default function PasskeyManager({ open, onClose, user, autoLockMinutes, o
 
   async function revoke(passkey) {
     const label = passkey.friendly_name || 'this device'
-    if (!window.confirm('Remove “' + label + '” from OneVault sign-in? You will not be able to use that passkey here again.')) return
+    if (!window.confirm('Remove “' + label + '” from OneVault sign-in? You will need your password to enable fingerprint unlock again.')) return
 
     setBusy(true)
     setError('')
     setNotice('')
     try {
-      const { error: deleteError } = await supabase.auth.passkey.delete({ passkeyId: passkey.id })
-      if (deleteError) throw deleteError
+      if (Capacitor.isNativePlatform() && passkey.native) {
+        await clearNativeSession()
+      } else {
+        const { error: deleteError } = await supabase.auth.passkey.delete({ passkeyId: passkey.id })
+        if (deleteError) throw deleteError
+      }
       await load()
       setNotice('Device access removed.')
     } catch (err) {
@@ -123,7 +137,9 @@ export default function PasskeyManager({ open, onClose, user, autoLockMinutes, o
         <div className="device-security-icon"><Fingerprint size={22}/></div>
         <div>
           <strong>Private device sign-in</strong>
-          <span>{passkeys.length} registered device{passkeys.length === 1 ? '' : 's'}</span>
+          <span>{Capacitor.isNativePlatform()
+            ? (passkeys.length ? 'Fingerprint unlock enabled on this device' : 'No device unlock registered')
+            : passkeys.length + ' registered device' + (passkeys.length === 1 ? '' : 's')}</span>
         </div>
         <ShieldCheck size={17}/>
       </div>
@@ -151,7 +167,9 @@ export default function PasskeyManager({ open, onClose, user, autoLockMinutes, o
               ) : (
                 <>
                   <strong>{passkey.friendly_name || 'Registered device'}</strong>
-                  <small>{deviceHint(passkey.friendly_name)} · Added {passkey.created_at ? new Date(passkey.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : 'recently'}</small>
+                  <small>{passkey.native
+                    ? deviceHint('android') + ' · Stored securely on this device'
+                    : deviceHint(passkey.friendly_name) + ' · Added ' + (passkey.created_at ? new Date(passkey.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : 'recently')}</small>
                 </>
               )}
             </div>
