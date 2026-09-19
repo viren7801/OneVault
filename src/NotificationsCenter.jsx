@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Bell,
   Check,
@@ -370,7 +371,7 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
         {unreadCount > 0 && <span>{unreadCount > 9 ? '9+' : unreadCount}</span>}
       </button>
 
-      {open && (
+      {open && typeof document !== 'undefined' && createPortal(
         <div className="notification-layer" onMouseDown={onClose}>
           <section className="notification-center" onMouseDown={event => event.stopPropagation()}>
             <header className="notification-center-header">
@@ -434,7 +435,8 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
             {notice && <div className="telegram-notice">{notice}</div>}
             {error && <div className="form-error notification-error">{error}</div>}
           </section>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   )
