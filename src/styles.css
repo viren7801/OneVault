@@ -1175,3 +1175,137 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .mobile-bottom-nav{left:7px;right:7px;bottom:7px;border-radius:16px}
   .mobile-bottom-item{min-height:48px;font-size:6.5px}
 }
+
+
+/* --- Mobile UX pass --- */
+html,body,#root{overflow-x:hidden}
+body{overscroll-behavior-x:none}
+.app-shell{width:100%;overflow-x:clip}
+.topbar-left,.topbar-actions,.content,.panel,.modal,.dashboard-page,.pocket-page,.reminders-page,.passwords-page,.notes-page{min-width:0}
+.topbar-actions{flex-shrink:1}
+.network-status,.onevault-update-pill,.command-trigger,.topbar-actions>.primary-btn{flex:0 0 auto}
+
+@media (max-width:760px){
+  .main-area{padding-bottom:calc(82px + env(safe-area-inset-bottom))}
+  .topbar{position:sticky;top:0;z-index:30;min-height:68px;padding-top:env(safe-area-inset-top);background:rgba(11,11,13,.78);border-bottom-color:rgba(255,255,255,.07)}
+  .topbar-actions{max-width:58%;overflow:visible;gap:5px}
+  .topbar-actions .primary-btn{min-width:40px;width:40px;height:40px;padding:0;border-radius:12px;font-size:0}
+  .topbar-actions .primary-btn svg{width:18px;height:18px}
+  .topbar-actions .command-trigger{width:40px;min-width:40px;height:40px;padding:0;border-radius:12px}
+  .topbar-actions .network-status.offline{height:30px}
+  .content{padding:16px 13px calc(24px + env(safe-area-inset-bottom))}
+  .hero-row,.pocket-toolbar,.reminders-toolbar,.module-toolbar{margin-top:2px}
+  .hero-row h2{font-size:clamp(30px,9vw,39px)}
+
+  .stat-grid,.pocket-kpis,.reminder-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .stat-card{min-height:96px;padding:12px;grid-template-columns:auto minmax(0,1fr)}
+  .stat-card>strong{grid-column:2;grid-row:auto;font-size:15px}
+  .stat-meta span{font-size:10px}
+  .stat-meta small{font-size:8px}
+  .money-card,.reminder-stat{min-height:94px;padding:12px}
+  .money-card strong,.reminder-stat strong{font-size:19px}
+
+  .pocket-chart-grid,.pocket-columns,.reminders-layout,.passwords-layout,.notes-layout{grid-template-columns:1fr}
+  .pocket-side,.reminders-side{grid-template-columns:1fr}
+  .chart-panel{min-height:250px}
+  .bar-chart{height:205px;padding:18px 13px 16px;gap:8px}
+  .bar-track{height:135px}
+  .transaction-filters,.reminder-search{padding:10px;gap:7px}
+  .search-box{min-width:0;height:40px}
+  .filter-tabs{width:100%;overflow:auto;scrollbar-width:none}
+  .filter-tabs::-webkit-scrollbar{display:none}
+  .filter-tabs button{flex:0 0 auto;min-height:36px}
+  .tx-row{grid-template-columns:minmax(0,1fr) auto auto;gap:7px;padding:11px 10px}
+  .tx-main{gap:8px}
+  .tx-main strong{max-width:none}
+  .row-actions{gap:2px}
+
+  .calendar-panel{overflow:visible}
+  .calendar-weekdays{padding:9px 5px 6px}
+  .calendar-weekdays span{font-size:8px}
+  .calendar-day{min-height:52px;padding:6px 4px}
+  .calendar-number{width:23px;height:23px;font-size:10px}
+  .calendar-dots{margin-top:5px;gap:3px;padding-left:2px}
+  .calendar-dots b{display:none}
+  .reminder-list{max-height:44vh}
+  .reminder-row{grid-template-columns:auto minmax(0,1fr);padding:10px 6px}
+  .reminder-actions{grid-column:2;justify-content:flex-start;margin-top:1px}
+
+  .password-list,.note-list{max-height:42vh}
+  .password-row,.note-list-row{min-height:58px}
+  .password-detail-footer,.note-detail-footer{gap:8px}
+  .secret-field{padding:13px 14px}
+  .secret-field>div{align-items:flex-start}
+  .secret-field strong,.secret-field a{white-space:normal;overflow-wrap:anywhere}
+  .detail-actions{flex-wrap:wrap}
+  .notes-command{overflow-x:auto}
+
+  .panel-header{min-width:0}
+  .panel-header>div{min-width:0}
+  .panel-header h3{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .module-toolbar-actions,.pocket-actions,.reminders-actions{overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;scrollbar-width:none;padding-bottom:2px}
+  .module-toolbar-actions::-webkit-scrollbar,.pocket-actions::-webkit-scrollbar,.reminders-actions::-webkit-scrollbar{display:none}
+  .module-toolbar-actions>* ,.pocket-actions>* ,.reminders-actions>*{min-height:42px;flex:0 0 auto}
+
+  .modal-layer{align-items:flex-end;padding:8px}
+  .modal{width:100%;max-width:none;max-height:calc(100dvh - 16px);padding:16px 15px calc(14px + env(safe-area-inset-bottom));border-radius:20px;overscroll-behavior:contain}
+  .modal-header{position:sticky;top:-16px;z-index:3;margin:0 -15px 15px;padding:12px 15px 11px;background:rgba(18,18,22,.96);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.045)}
+  .modal h3{font-size:18px}
+  .modal-actions{position:sticky;bottom:calc(-14px - env(safe-area-inset-bottom));z-index:3;display:grid;grid-template-columns:1fr 1fr;padding:12px 0 max(2px,env(safe-area-inset-bottom));margin:10px -1px -1px;background:linear-gradient(180deg,rgba(18,18,22,.70),#121216 38%)}
+  .modal-actions .primary-btn,.modal-actions .secondary-btn{width:100%;min-height:44px}
+  .form-grid{grid-template-columns:1fr}
+  .amount-input{height:68px}
+  .amount-input input{font-size:27px!important}
+  .quick-grid{grid-template-columns:1fr}
+  .quick-option{min-height:66px}
+  .device-security-modal .modal-actions{grid-template-columns:1fr 1fr}
+  .device-security-modal .modal-actions .primary-btn{grid-column:1/-1;grid-row:1}
+
+  .vault-gate{width:100%;margin:8px auto 0;padding:20px 16px}
+  .vault-gate h2{font-size:24px}
+  .device-login-btn,.auth-submit{min-height:48px}
+  .auth-form input,.expense-form input,.expense-form select,.vault-gate-form input,.secret-input-wrap input{font-size:16px}
+
+  .command-layer{align-items:flex-start;padding-top:max(76px,calc(68px + env(safe-area-inset-top)))}
+  .command-palette{width:calc(100vw - 20px);max-height:calc(100dvh - 94px)}
+  .command-list{max-height:55vh}
+
+  .mobile-bottom-nav{bottom:max(7px,env(safe-area-inset-bottom));padding-bottom:calc(6px + env(safe-area-inset-bottom));}
+}
+
+@media (max-width:430px){
+  .topbar-actions{max-width:62%}
+  .topbar-actions .network-status.offline{display:flex}
+  .content{padding-left:10px;padding-right:10px}
+  .dashboard-heading-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}
+  .dashboard-heading-actions>*{min-width:0}
+  .dashboard-card,.dashboard-wide-card,.dashboard-security-card,.dashboard-activity-card{min-height:142px}
+  .dashboard-stat-number{font-size:27px}
+  .dashboard-money-main{font-size:22px}
+  .pocket-toolbar h2,.reminders-toolbar h2,.module-toolbar h2{font-size:24px}
+  .pocket-toolbar p,.reminders-toolbar p,.module-toolbar p{font-size:10px;line-height:1.45}
+  .pocket-kpis,.reminder-kpis{gap:6px}
+  .money-card,.reminder-stat{padding:11px}
+  .money-card span,.reminder-stat span{font-size:8px}
+  .money-card strong,.reminder-stat strong{font-size:17px}
+  .calendar-day{min-height:47px;padding:5px 3px}
+  .calendar-number{width:21px;height:21px;font-size:9px}
+  .tx-row{grid-template-columns:minmax(0,1fr) auto;}
+  .tx-row>.row-actions{grid-column:2;grid-row:1;}
+  .tx-row>.expense-text,.tx-row>.income-text{grid-column:1;grid-row:2;margin-left:42px}
+  .tx-row>.tx-account{grid-column:1;grid-row:3;margin-left:42px}
+  .notes-editor-meta{grid-template-columns:1fr}
+  .history-row{padding:11px}
+  .modal-actions{grid-template-columns:1fr}
+  .device-security-modal .modal-actions{grid-template-columns:1fr 1fr}
+  .device-security-modal .modal-actions .primary-btn{grid-column:1/-1}
+}
+
+@media (max-width:360px){
+  .topbar-actions{gap:3px}
+  .topbar-actions .command-trigger,.topbar-actions .primary-btn,.onevault-update-pill{width:38px;min-width:38px;height:38px}
+  .topbar h1{max-width:82px;font-size:14px}
+  .content{padding-left:8px;padding-right:8px}
+  .mobile-bottom-nav{left:5px;right:5px}
+  .mobile-bottom-item{min-height:45px}
+}
