@@ -840,6 +840,7 @@ function App() {
   const [showPasskeyManager, setShowPasskeyManager] = useState(false)
   const [commandOpen, setCommandOpen] = useState(false)
   const [commandQuery, setCommandQuery] = useState('')
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine)
   const [autoLockMinutes, setAutoLockMinutes] = useState(() => {
     const stored = Number(window.localStorage.getItem('onevault:autoLockMinutes'))
     return Number.isFinite(stored) && stored >= 0 ? stored : 15
@@ -945,6 +946,25 @@ function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
+  useEffect(() => {
+    const setOnline = () => setIsOnline(true)
+    const setOffline = () => setIsOnline(false)
+    window.addEventListener('online', setOnline)
+    window.addEventListener('offline', setOffline)
+    return () => {
+      window.removeEventListener('online', setOnline)
+      window.removeEventListener('offline', setOffline)
+    }
+  }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('quickAdd') === '1') {
+      setQuickAdd(true)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+
   if (authLoading) return <div className="loading-screen">Loading oneVault…</div>
 
   async function handleSignedIn(signedUser, offerDeviceSetup = false) {
@@ -981,7 +1001,7 @@ function App() {
       <nav className="module-nav"><div className="nav-label">YOUR SPACE</div>{modules.map(m=>{const Icon=m.icon;return <button key={m.id} className={`module-btn ${active===m.id?'selected':''}`} onClick={()=>{setActive(m.id);setMobileOpen(false)}}><span className="module-icon"><Icon size={19}/></span><span className="module-copy"><strong>{m.label}</strong><small>{m.description}</small></span><ChevronRight size={15} className="module-arrow"/></button>})}</nav>
       <div className="sidebar-footer"><div className="privacy-card"><ShieldCheck size={18}/><div><strong>Private mode</strong><span>Owner-only database access.</span></div></div><button className="device-security-btn" onClick={()=>setShowPasskeyManager(true)}><Fingerprint size={15}/> Security</button><button className="logout-btn" onClick={signOut}><LogOut size={16}/> Sign out</button></div>
     </aside>
-    {mobileOpen&&<button className="backdrop" onClick={()=>setMobileOpen(false)}/>}<main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-btn mobile-menu" onClick={()=>setMobileOpen(true)}><Menu size={20}/></button><div><div className="eyebrow">PRIVATE DASHBOARD</div><h1>{activeModule.label}</h1></div></div><div className="topbar-actions"><button className="command-trigger" onClick={()=>setCommandOpen(true)} title="Command palette"><Search size={15}/><span>Search</span><kbd>⌘K</kbd></button><button className="primary-btn" onClick={()=>active==='pocket'?openTransaction('expense'):active==='reminders'?openReminder():active==='passwords'?openPassword():active==='notes'?openNote():setQuickAdd(true)}><Plus size={17}/> Quick add</button></div></header>
+    {mobileOpen&&<button className="backdrop" onClick={()=>setMobileOpen(false)}/>}<main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-btn mobile-menu" onClick={()=>setMobileOpen(true)}><Menu size={20}/></button><div><div className="eyebrow">PRIVATE DASHBOARD</div><h1>{activeModule.label}</h1></div></div><div className="topbar-actions"><span className={`network-status ${isOnline?'online':'offline'}`} title={isOnline?'Online':'Offline'}><span className="network-dot"/><span>{isOnline?'Online':'Offline'}</span></span><button className="command-trigger" onClick={()=>setCommandOpen(true)} title="Command palette"><Search size={15}/><span>Search</span><kbd>⌘K</kbd></button><button className="primary-btn" onClick={()=>active==='pocket'?openTransaction('expense'):active==='reminders'?openReminder():active==='passwords'?openPassword():active==='notes'?openNote():setQuickAdd(true)}><Plus size={17}/> Quick add</button></div></header>
        <section className="content">{(active==='pocket'||active==='reminders')&&<div className="hero-row"><div><span className="pill"><span className="status-dot"/> Private workspace</span><h2>Everything personal,<br/><span>in one place.</span></h2><p>Expenses, reminders, passwords and notes with one clean interface across your devices.</p></div><div className="date-card"><div className="date-label">TODAY</div><div className="date-value">{new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div><div className="date-helper">{user.email}</div></div></div>}
         {active==='home'?<Dashboard user={user} onNavigate={moduleId=>{setActive(moduleId);setMobileOpen(false)}} onQuickAdd={()=>setQuickAdd(true)} onOpenSecurity={()=>setShowPasskeyManager(true)} autoLockMinutes={autoLockMinutes}/>:active==='pocket'?<Pocket user={user} onQuickAdd={openTransaction}/>:active==='reminders'?<Reminders user={user}/>:active==='passwords'?<Passwords user={user}/>:active==='notes'?<Notes user={user}/>:<div className="workspace-grid"><section className="panel large-panel"><div className="panel-header"><div><div className="panel-kicker">MODULE</div><h3>{activeModule.label}</h3></div><button className="text-btn" onClick={()=>quickCreate(active)}>Add new <Plus size={15}/></button></div></section></div>}
       </section></main>
