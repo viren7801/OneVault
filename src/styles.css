@@ -3751,7 +3751,25 @@ body{overscroll-behavior-x:none}
 /* --- Calendar tap behavior on phones --- */
 @media (max-width:760px) {
   .calendar-preview {
-    display: none !important;
+    display: block !important;
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: calc(82px + env(safe-area-inset-bottom));
+    top: auto;
+    width: auto;
+    max-height: min(42dvh, 360px);
+    overflow: auto;
+    z-index: 140;
+    border-radius: 20px;
+    padding: 14px;
+    box-shadow:
+      0 24px 70px rgba(0,0,0,.48),
+      inset 0 1px 0 rgba(255,255,255,.12);
+  }
+
+  .calendar-preview-add {
+    min-height: 42px;
   }
 
   .calendar-day {
