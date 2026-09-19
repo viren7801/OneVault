@@ -14,6 +14,7 @@ import Passwords from './Passwords'
 import Notes from './Notes'
 import PasskeyManager from './PasskeyManager'
 import Dashboard from './Dashboard'
+import BrainModal from './BrainModal'
 
 const modules = [
   { id: 'home', label: 'Home', icon: LayoutDashboard, description: 'Your private overview' },
@@ -1241,6 +1242,7 @@ function App() {
   const [showPasskeyManager, setShowPasskeyManager] = useState(false)
   const [commandOpen, setCommandOpen] = useState(false)
   const [commandQuery, setCommandQuery] = useState('')
+  const [brainOpen, setBrainOpen] = useState(false)
   const [isOnline, setIsOnline] = useState(() => navigator.onLine)
   const [autoLockMinutes, setAutoLockMinutes] = useState(() => {
     const stored = Number(window.localStorage.getItem('onevault:autoLockMinutes'))
@@ -1352,6 +1354,14 @@ function App() {
       keywords: `${module.label} ${module.description}`,
       run: () => { setActive(module.id); setMobileOpen(false); setCommandOpen(false); setCommandQuery('') },
     })),
+    {
+      id: 'brain',
+      label: 'Ask OneVault',
+      description: 'Ask questions across Pocket, reminders, accounts and budgets',
+      icon: Sparkles,
+      keywords: 'ai brain ask question money spending expense reminders accounts budgets',
+      run: () => { setCommandOpen(false); setCommandQuery(''); setBrainOpen(true) },
+    },
     {
       id: 'quick-add',
       label: 'Quick add',
@@ -1512,6 +1522,7 @@ function App() {
       </div>
     </div>}
 
+    {brainOpen&&<BrainModal user={user} onClose={()=>setBrainOpen(false)}/>}
     <PasskeyManager
       open={showPasskeyManager}
       onClose={()=>setShowPasskeyManager(false)}
