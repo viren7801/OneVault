@@ -259,6 +259,33 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
     }
   }
 
+
+
+  async function syncFromPrefs({ silent = true } = {}) {
+    if (!prefs.reminderAlerts && !prefs.dailyBrief && !prefs.weeklyReview) return
+    try {
+      const permission = await getNotificationPermission()
+      setDevicePermission(permission)
+      if (!permission.granted) return
+
+      const { data: reminders } = await supabase
+        .from('reminders')
+        .select('id,title,description,due_at,completed')
+        .eq('user_id', user.id)
+        .order('due_at', { ascending: true })
+        .limit(1000)
+
+      await syncLocalNotifications({
+        reminders: reminders || [],
+        reminderAlerts: prefs.reminderAlerts,
+        dailyBrief: prefs.dailyBrief,
+        weeklyReview: prefs.weeklyReview,
+      })
+    } catch (syncError) {
+      if (!silent) setError(syncError.message || 'Could not refresh device notifications.')
+    }
+  }
+
   async function updatePreference(key, value) {
     const next = { ...prefs, [key]: value }
     setPrefs(next)
@@ -312,9 +339,13 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
   useEffect(() => {
     refreshPermission()
     void loadCenter()
-    const interval = window.setInterval(() => { void loadCenter({ silent: true }) }, 60000)
+    const interval = window.setInterval(() => {
+      void loadCenter({ silent: true })
+      void syncFromPrefs()
+    }, 60000)
+    void syncFromPrefs()
     return () => window.clearInterval(interval)
-  }, [user.id])
+  }, [user.id, prefs.reminderAlerts, prefs.dailyBrief, prefs.weeklyReview])
 
   useEffect(() => {
     if (!open) return
