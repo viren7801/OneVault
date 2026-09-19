@@ -98,7 +98,9 @@ export default function Dashboard({ user, onNavigate, onQuickAdd, onOpenSecurity
     }))
   }, [transactions])
 
-  const nextReminder = useMemo(() => reminders[0] || null, [reminders])
+  const nextReminder = useMemo(() => {
+    return reminders.find(item => new Date(item.due_at).getTime() > clockNow) || null
+  }, [reminders, clockNow])
 
   useEffect(() => {
     const timer = window.setInterval(() => setClockNow(Date.now()), 1000)
