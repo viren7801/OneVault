@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import {
-  Bell, Bookmark, CalendarDays, Check, ChevronDown, ChevronRight, CircleDollarSign, CreditCard, Edit3, Filter, Fingerprint,
+  Bell, Bookmark, CalendarDays, Check, ChevronRight, CircleDollarSign, CreditCard, Edit3, Fingerprint,
   LayoutDashboard, MessageCircle, LockKeyhole, LogOut, Menu, NotebookPen, Plus, RotateCcw, Search, ShieldCheck,
-  SlidersHorizontal, ArrowUpDown,
+  SlidersHorizontal,
   Trash2, WalletCards, X, TrendingDown, TrendingUp, PiggyBank, RefreshCw, ScanLine, ImagePlus, Loader2,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
