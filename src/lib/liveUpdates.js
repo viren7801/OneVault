@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { LiveUpdate } from '@capawesome/capacitor-live-update'
 
-const MANIFEST_URL = 'https://onevault.patelviren.com/live-updates/latest.json'
+const MANIFEST_URL = 'https://raw.githubusercontent.com/viren7801/OneVault/main/public/live-updates/latest.json'
 const CURRENT_BUNDLE_ID = import.meta.env.VITE_BUILD_ID || null
 const STATUS_TIMEOUT_MS = 7000
 const READY_TIMEOUT_MS = 10000
