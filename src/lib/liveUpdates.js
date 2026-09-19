@@ -123,32 +123,23 @@ export async function getLiveUpdateStatus() {
     }
   }
 
-  await initializeLiveUpdates()
+  // Readiness is a startup concern. Do not block the manual update checker on it.
+  void initializeLiveUpdates()
 
-  const [manifest, current, next] = await Promise.all([
+  const [manifest, current] = await Promise.all([
     fetchManifest(),
     callLiveUpdate('getCurrentBundle'),
-    callLiveUpdate('getNextBundle'),
   ])
 
   const currentBundleId = current?.bundleId || null
-  const nextBundleId = next?.bundleId || null
-  const available = Boolean(
-    manifest.bundleId &&
-    manifest.bundleId !== currentBundleId,
-  )
-  const staged = Boolean(
-    manifest.bundleId &&
-    manifest.bundleId === nextBundleId &&
-    manifest.bundleId !== currentBundleId,
-  )
+  const available = Boolean(manifest.bundleId && manifest.bundleId !== currentBundleId)
 
   return {
     supported: true,
     available,
     staged,
     currentBundleId,
-    nextBundleId,
+    nextBundleId: null,
     latestBundleId: manifest.bundleId,
     latestUrl: manifest.url,
     checksum: manifest.checksum,
@@ -161,17 +152,15 @@ export async function installLatestLiveUpdate(onProgress) {
     throw new Error('Live updates are only available in the native OneVault app.')
   }
 
-  await initializeLiveUpdates()
+  // Do not wait for plugin readiness here. It is already kicked off at startup.
+  void initializeLiveUpdates()
 
   const manifest = await fetchManifest()
   const current = await callLiveUpdate('getCurrentBundle')
-  const next = await callLiveUpdate('getNextBundle')
 
   if (manifest.bundleId === current?.bundleId) {
     return { updated: false, bundleId: manifest.bundleId }
   }
-
-  if (manifest.bundleId !== next?.bundleId) {
     const listener = await liveUpdate.addListener('downloadBundleProgress', event => {
       if (event?.bundleId !== manifest.bundleId) return
       const progress = Math.max(0, Math.min(1, Number(event.progress) || 0))
@@ -204,7 +193,7 @@ export async function installLatestLiveUpdate(onProgress) {
 
   return {
     updated: true,
-    staged: manifest.bundleId === next?.bundleId,
+    staged: true,
     bundleId: manifest.bundleId,
     reload: () => liveUpdate.reload(),
   }
