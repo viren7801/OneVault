@@ -31,7 +31,7 @@ export default function UpdateCenter() {
         setState('available')
         setMessage(status.staged
           ? 'The latest update is already downloaded. Tap Update now to apply it.'
-          : 'A new oneVault update is ready to install.')
+          : 'A new OneVault update is ready to install.')
       } else {
         setState('current')
         setMessage('You are already using the latest app update.')
@@ -44,7 +44,7 @@ export default function UpdateCenter() {
 
   async function updateNow() {
     setState('downloading')
-    setMessage('Downloading the latest oneVault update…')
+    setMessage('Downloading the latest OneVault update…')
     setProgress(0)
     try {
       const result = await installLatestLiveUpdate(value => setProgress(value))
@@ -54,7 +54,7 @@ export default function UpdateCenter() {
         return
       }
       setState('restarting')
-      setMessage('Update downloaded. Restarting oneVault…')
+      setMessage('Update downloaded. Restarting OneVault…')
       window.setTimeout(() => {
         void result.reload?.()
       }, 350)
@@ -70,7 +70,7 @@ export default function UpdateCenter() {
   }
 
   return <>
-    <button className="onevault-update-pill" onClick={openCenter} title="Check for oneVault updates">
+    <button className="onevault-update-pill" onClick={openCenter} title="Check for OneVault updates">
       <DownloadCloud size={15} />
       <span>Updates</span>
     </button>
@@ -80,7 +80,7 @@ export default function UpdateCenter() {
         <header className="update-center-header">
           <div>
             <div className="update-center-kicker"><Zap size={13} /> ONEVAULT UPDATE CENTER</div>
-            <h3>Keep oneVault current</h3>
+            <h3>Keep OneVault current</h3>
             <p>Normal app features can be delivered directly to this installed app without another APK.</p>
           </div>
           <button className="update-center-close" onClick={() => setOpen(false)} aria-label="Close"><X size={17} /></button>
@@ -96,7 +96,7 @@ export default function UpdateCenter() {
                 : state === 'available' ? 'Update available'
                 : state === 'downloading' ? 'Downloading update…'
                 : state === 'restarting' ? 'Applying update…'
-                : state === 'current' ? 'oneVault is up to date'
+                : state === 'current' ? 'OneVault is up to date'
                 : 'Ready to update'}
             </strong>
             <span>{message || 'Tap check to see whether a newer web-layer version is available.'}</span>
@@ -120,8 +120,8 @@ export default function UpdateCenter() {
           {state === 'available' && <button className="primary-btn" onClick={() => void updateNow()}>
             <DownloadCloud size={15} /> Update now
           </button>}
-          {state === 'current' && <button className="primary-btn" onClick={() => void check()}>
-            <Check size={15} /> Check again
+          {(state === 'current' || state === 'error') && <button className="primary-btn" onClick={() => void check()} disabled={state === 'checking'}>
+            {state === 'error' ? <RefreshCw size={15} /> : <Check size={15} />} Check again
           </button>}
         </div>
 
