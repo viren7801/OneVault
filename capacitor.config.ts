@@ -1,5 +1,6 @@
 import type { CapacitorConfig } from '@capacitor/cli'
 
+// Native base build: includes the in-app Update Center and Live Update runtime.
 const config: CapacitorConfig = {
   appId: 'com.patelviren.onevault',
   appName: 'oneVault',
