@@ -5,6 +5,10 @@ const STORAGE_KEY = 'supabase_session'
 let biometricPromise
 let secureStoragePromise
 
+function isAndroid() {
+  return Capacitor.getPlatform() === 'android'
+}
+
 async function getBiometricAuth() {
   if (!Capacitor.isNativePlatform()) return null
   if (!biometricPromise) {
@@ -29,16 +33,63 @@ function error(message, code) {
 
 async function checkBiometricAvailability() {
   const biometricAuth = await getBiometricAuth()
-  if (!biometricAuth) return { isAvailable: false, biometryType: 'web' }
+  if (!biometricAuth) return { isAvailable: false, strongBiometryIsAvailable: false, biometryType: 'web' }
   return biometricAuth.checkBiometry()
+}
+
+async function requireBiometricAvailability() {
+  const availability = await checkBiometricAvailability()
+
+  if (!availability?.isAvailable) {
+    return {
+      ok: false,
+      error: error(
+        availability?.reason
+          ? 'Biometric unlock is not available: ' + availability.reason
+          : 'Set up a fingerprint, face unlock, or device credential in Android Settings first.',
+        availability?.code,
+      ),
+    }
+  }
+
+  if (isAndroid() && !availability?.strongBiometryIsAvailable) {
+    return {
+      ok: false,
+      error: error(
+        availability?.strongReason
+          ? 'Fingerprint / strong biometric is not available: ' + availability.strongReason
+          : 'Set up a fingerprint or another strong biometric in Android Settings before enabling device unlock.',
+        availability?.strongCode,
+      ),
+    }
+  }
+
+  return { ok: true, availability }
+}
+
+function authenticateOptions(reason, title, subtitle) {
+  const options = {
+    reason,
+    cancelTitle: 'Cancel',
+    allowDeviceCredential: true,
+    androidTitle: title,
+    androidSubtitle: subtitle,
+    androidConfirmationRequired: false,
+  }
+
+  if (isAndroid()) {
+    options.androidBiometryStrength = 'strong'
+  }
+
+  return options
 }
 
 export async function persistNativeSession(session) {
   if (!Capacitor.isNativePlatform() || !session?.access_token || !session?.refresh_token) return false
 
   try {
-    const info = await checkBiometricAvailability()
-    if (!info?.isAvailable) return false
+    const availability = await requireBiometricAvailability()
+    if (!availability.ok) return false
 
     const secureStorage = await getSecureStorage()
     await secureStorage.set(STORAGE_KEY, {
@@ -75,29 +126,26 @@ export async function registerNativeAwarePasskey() {
     }
 
     const biometricAuth = await getBiometricAuth()
-    const availability = await biometricAuth.checkBiometry()
-    if (!availability?.isAvailable) {
-      return {
-        data: null,
-        error: error(
-          availability?.reason
-            ? 'Biometric unlock is not available: ' + availability.reason
-            : 'Set up a fingerprint, face unlock, or device credential in Android Settings first.',
-          availability?.code,
-        ),
-      }
+    const availability = await requireBiometricAvailability()
+    if (!availability.ok) {
+      return { data: null, error: availability.error }
     }
 
-    await biometricAuth.authenticate({
-      reason: 'Confirm you want to use this device to unlock oneVault.',
-      cancelTitle: 'Cancel',
-      allowDeviceCredential: true,
-      androidTitle: 'Enable oneVault device unlock',
-      androidSubtitle: 'Use your fingerprint or device PIN to protect oneVault.',
-      androidConfirmationRequired: false,
-    })
+    await biometricAuth.authenticate(
+      authenticateOptions(
+        'Confirm you want to use this device to unlock oneVault.',
+        'Enable oneVault device unlock',
+        'Use your fingerprint or strong device biometric. Your PIN remains available as fallback.',
+      ),
+    )
 
-    await persistNativeSession(data.session)
+    const stored = await persistNativeSession(data.session)
+    if (!stored) {
+      return {
+        data: null,
+        error: error('The biometric check succeeded, but the protected device session could not be stored.'),
+      }
+    }
 
     return { data: { user: data.session.user }, error: null }
   } catch (nativeError) {
@@ -127,28 +175,20 @@ export async function signInWithNativeAwarePasskey() {
       }
     }
 
-    const biometricAuth = await getBiometricAuth()
-    const availability = await biometricAuth.checkBiometry()
-    if (!availability?.isAvailable) {
-      return {
-        data: null,
-        error: error(
-          availability?.reason
-            ? 'Biometric unlock is unavailable: ' + availability.reason
-            : 'Fingerprint or device unlock is not available on this device.',
-          availability?.code,
-        ),
-      }
+    const availability = await requireBiometricAvailability()
+    if (!availability.ok) {
+      return { data: null, error: availability.error }
     }
 
-    await biometricAuth.authenticate({
-      reason: 'Unlock your private oneVault workspace.',
-      cancelTitle: 'Cancel',
-      allowDeviceCredential: true,
-      androidTitle: 'Unlock oneVault',
-      androidSubtitle: 'Use your fingerprint or device PIN.',
-      androidConfirmationRequired: false,
-    })
+    const biometricAuth = await getBiometricAuth()
+
+    await biometricAuth.authenticate(
+      authenticateOptions(
+        'Unlock your private oneVault workspace.',
+        'Unlock oneVault',
+        'Use your fingerprint or strong device biometric. Your PIN remains available as fallback.',
+      ),
+    )
 
     const { data, error: setSessionError } = await supabase.auth.setSession({
       access_token: savedSession.access_token,
