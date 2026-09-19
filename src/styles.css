@@ -3250,3 +3250,144 @@ body{overscroll-behavior-x:none}
       0 10px 30px rgba(0,0,0,.12);
   }
 }
+
+
+/* --- Mobile topbar correction --- */
+@media (max-width:760px) {
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    box-sizing: border-box;
+    width: 100%;
+    height: calc(68px + env(safe-area-inset-top));
+    min-height: calc(68px + env(safe-area-inset-top));
+    margin: 0;
+    padding: env(safe-area-inset-top) 10px 0;
+    gap: 10px;
+    align-items: center;
+    border: 0;
+    border-radius: 0;
+    background:
+      linear-gradient(180deg, rgba(11,11,13,.72), rgba(11,11,13,.32) 72%, transparent);
+    box-shadow: none;
+    backdrop-filter: blur(18px) saturate(125%);
+    -webkit-backdrop-filter: blur(18px) saturate(125%);
+  }
+
+  .topbar-left {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 10px;
+  }
+
+  .topbar .eyebrow {
+    display: none;
+  }
+
+  .topbar h1 {
+    margin: 0;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 20px;
+    line-height: 1;
+    letter-spacing: -.035em;
+  }
+
+  .mobile-menu,
+  .topbar-actions .onevault-update-pill,
+  .topbar-actions .brain-topbar-btn,
+  .topbar-actions .command-trigger,
+  .topbar-actions > .primary-btn {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0 !important;
+    flex: 0 0 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+  }
+
+  .mobile-menu {
+    display: grid;
+  }
+
+  .topbar-actions {
+    max-width: none;
+    flex: 0 0 auto;
+    gap: 6px;
+    overflow: visible;
+  }
+
+  .topbar-actions .network-status.online {
+    display: none;
+  }
+
+  .topbar-actions .network-status.offline {
+    width: 10px;
+    min-width: 10px;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    background: transparent;
+    font-size: 0;
+  }
+
+  .topbar-actions .network-status.offline .network-dot {
+    width: 6px;
+    height: 6px;
+  }
+
+  .topbar-actions .onevault-update-pill span,
+  .topbar-actions .brain-topbar-btn span,
+  .topbar-actions .command-trigger span,
+  .topbar-actions .command-trigger kbd,
+  .topbar-actions > .primary-btn {
+    font-size: 0;
+  }
+
+  .topbar-actions > .primary-btn svg,
+  .topbar-actions .command-trigger svg,
+  .topbar-actions .onevault-update-pill svg,
+  .topbar-actions .brain-topbar-btn svg,
+  .mobile-menu svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+@media (max-width:430px) {
+  .topbar {
+    height: calc(62px + env(safe-area-inset-top));
+    min-height: calc(62px + env(safe-area-inset-top));
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .topbar h1 {
+    font-size: 19px;
+    max-width: 125px;
+  }
+
+  .mobile-menu,
+  .topbar-actions .onevault-update-pill,
+  .topbar-actions .brain-topbar-btn,
+  .topbar-actions .command-trigger,
+  .topbar-actions > .primary-btn {
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    min-height: 42px;
+    flex-basis: 42px;
+    border-radius: 13px;
+  }
+
+  .topbar-actions {
+    gap: 5px;
+  }
+}
