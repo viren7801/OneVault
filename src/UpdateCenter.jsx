@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Check, DownloadCloud, RefreshCw, X, Zap } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { getLiveUpdateStatus, initializeLiveUpdates, installLatestLiveUpdate } from './lib/liveUpdates'
@@ -75,7 +76,8 @@ export default function UpdateCenter() {
       <span>Updates</span>
     </button>
 
-    {open && <div className="update-center-layer" onMouseDown={() => setOpen(false)}>
+    {open && typeof document !== 'undefined' && createPortal(
+      <div className="update-center-layer" onMouseDown={() => setOpen(false)}>
       <section className="update-center-card" onMouseDown={event => event.stopPropagation()}>
         <header className="update-center-header">
           <div>
@@ -129,6 +131,8 @@ export default function UpdateCenter() {
           Native changes such as new Capacitor plugins, signing, or Android/iOS configuration still require a normal native release. UI, JavaScript, and CSS updates can use this button.
         </div>
       </section>
-    </div>}
+      </div>,
+      document.body,
+    )}
   </>
 }
