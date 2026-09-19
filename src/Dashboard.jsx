@@ -80,7 +80,43 @@ export default function Dashboard({ user, onNavigate, onQuickAdd, onOpenSecurity
     setLoading(false)
   }
 
-  useEffect(() => { void load() }, [user.id])
+  const todayKey = new Date(clockNow).toDateString()
+
+  useEffect(() => { void load() }, [user.id, todayKey])
+
+  const timeContext = useMemo(() => {
+    const hour = new Date(clockNow).getHours()
+    if (hour >= 5 && hour < 12) {
+      return {
+        period: 'Morning',
+        greeting: 'Good morning.',
+        message: 'Start your day with a clear view of what matters.',
+        focus: 'Start strong.',
+      }
+    }
+    if (hour >= 12 && hour < 17) {
+      return {
+        period: 'Afternoon',
+        greeting: 'Good afternoon.',
+        message: 'Keep your money, tasks and plans in sync.',
+        focus: 'Keep momentum.',
+      }
+    }
+    if (hour >= 17 && hour < 22) {
+      return {
+        period: 'Evening',
+        greeting: 'Good evening.',
+        message: 'Wrap up the day without losing sight of what is next.',
+        focus: 'Wind down.',
+      }
+    }
+    return {
+      period: 'Night',
+      greeting: 'Good night.',
+      message: 'Everything important is still within reach.',
+      focus: 'Rest easy.',
+    }
+  }, [clockNow])
 
   const moneyStats = useMemo(() => {
     const income = transactions.filter(item => item.type === 'income').reduce((sum, item) => sum + Number(item.amount), 0)
@@ -161,9 +197,9 @@ export default function Dashboard({ user, onNavigate, onQuickAdd, onOpenSecurity
   return <div className="dashboard-page">
     <div className="dashboard-heading">
       <div>
-        <div className="panel-kicker">HOME</div>
-        <h2>Your day, at a glance.</h2>
-        <p>Private overview of money, reminders and security.</p>
+        <div className="panel-kicker">{timeContext.period} · HOME</div>
+        <h2>{timeContext.greeting} <span>Your day, at a glance.</span></h2>
+        <p>{timeContext.message}</p>
       </div>
       <div className="dashboard-heading-actions">
         <button className="secondary-btn" onClick={()=>void load()}><span className="refresh-glyph">↻</span> Refresh</button>
@@ -200,8 +236,8 @@ export default function Dashboard({ user, onNavigate, onQuickAdd, onOpenSecurity
       <div className="dashboard-today-main">
         <div className="dashboard-section-head">
           <div>
-            <div className="panel-kicker">TODAY</div>
-            <h3>{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
+            <div className="panel-kicker">TODAY · {timeContext.period}</div>
+            <h3>{new Date(clockNow).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
           </div>
           <span className="dashboard-today-count">{todayReminders.length} reminder{todayReminders.length === 1 ? '' : 's'}</span>
         </div>
@@ -228,8 +264,8 @@ export default function Dashboard({ user, onNavigate, onQuickAdd, onOpenSecurity
       <div className="dashboard-today-side">
         <div className="dashboard-section-head compact">
           <div>
-            <div className="panel-kicker">QUICK VIEW</div>
-            <h3>Make it happen.</h3>
+            <div className="panel-kicker">QUICK VIEW · {timeContext.period}</div>
+            <h3>{timeContext.focus}</h3>
           </div>
           <CalendarClock size={17}/>
         </div>
