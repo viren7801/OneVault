@@ -133,9 +133,15 @@ export default async function handler(req, res) {
     const body = readJsonBody(req)
     const question = String(body?.question || '').trim()
     const context = compactSourceKeys(body?.context || {})
+    const mode = body?.mode === 'claude' ? 'claude' : 'quick'
 
     if (!question) {
       res.status(400).json({ error: 'Ask OneVault a question.' })
+      return
+    }
+
+    if (mode !== 'claude') {
+      res.status(400).json({ error: 'Quick mode is handled locally.', code: 'LOCAL_MODE' })
       return
     }
 
@@ -158,8 +164,8 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: process.env.BRAIN_MODEL || 'claude-haiku-4-5-20251001',
-        max_tokens: 700,
+        model: process.env.BRAIN_MODEL || 'claude-sonnet-5',
+        max_tokens: 1800,
         system: SYSTEM_PROMPT,
         messages: [
           {
