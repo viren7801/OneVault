@@ -4,6 +4,8 @@ import { SecureStorage } from '@aparajita/capacitor-secure-storage'
 import { supabase } from './supabase'
 
 const STORAGE_KEY = 'supabase_session'
+const DEVICE_KEY = 'native_biometric_device'
+const DEVICE_NAME_KEY = 'native_biometric_device_name'
 
 function isAndroid() {
   return Capacitor.getPlatform() === 'android'
@@ -81,6 +83,7 @@ export async function persistNativeSession(session) {
       access_token: session.access_token,
       refresh_token: session.refresh_token,
     })
+    await SecureStorage.set(DEVICE_KEY, { enabled: true })
     return true
   } catch (nativeError) {
     console.warn('[OneVault] native biometric session was not stored:', nativeError?.message || nativeError)
@@ -93,9 +96,48 @@ export async function clearNativeSession() {
 
   try {
     await SecureStorage.remove(STORAGE_KEY)
+    await SecureStorage.remove(DEVICE_KEY)
+    await SecureStorage.remove(DEVICE_NAME_KEY)
   } catch (nativeError) {
     console.warn('[OneVault] native biometric session cleanup failed:', nativeError?.message || nativeError)
   }
+}
+
+export async function getNativeDeviceStatus() {
+  if (!Capacitor.isNativePlatform()) {
+    return { registered: false, deviceName: '' }
+  }
+
+  try {
+    const [marker, savedSession, name] = await Promise.all([
+      SecureStorage.get(DEVICE_KEY),
+      SecureStorage.get(STORAGE_KEY),
+      SecureStorage.get(DEVICE_NAME_KEY),
+    ])
+
+    const registered = Boolean(marker?.enabled || (savedSession?.access_token && savedSession?.refresh_token))
+    if (registered && !marker?.enabled) {
+      await SecureStorage.set(DEVICE_KEY, { enabled: true })
+    }
+
+    return {
+      registered,
+      deviceName: typeof name === 'string' && name.trim() ? name : 'This Android device',
+    }
+  } catch (nativeError) {
+    console.warn('[OneVault] native device status check failed:', nativeError?.message || nativeError)
+    return { registered: false, deviceName: 'This Android device' }
+  }
+}
+
+export async function renameNativeDevice(name) {
+  if (!Capacitor.isNativePlatform()) return
+  const trimmed = String(name || '').trim()
+  if (!trimmed) {
+    await SecureStorage.remove(DEVICE_NAME_KEY)
+    return
+  }
+  await SecureStorage.set(DEVICE_NAME_KEY, trimmed)
 }
 
 export async function registerNativeAwarePasskey() {
