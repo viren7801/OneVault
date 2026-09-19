@@ -1,0 +1,20 @@
+name: Keep Supabase Awake
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # every day at 6am UTC
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase
+        env:
+          SUPABASE_URL: "https://gskxfpuotdynbeokruhj.supabase.co"
+          SUPABASE_PUBLISHABLE_KEY: "sb_publishable_CrOQDv7o5DNUBiw0PKZhPg_aq8H9eTD"
+        run: |
+          set -euo pipefail
+          status="$(curl -sS -o /dev/null -w "%{http_code}"             "${SUPABASE_URL}/rest/v1/onevault_keepalive?select=id&limit=1"             -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}")"
+          echo "Supabase keepalive HTTP status: ${status}"
+          test "${status}" = "200"
