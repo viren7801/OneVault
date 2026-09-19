@@ -5,6 +5,7 @@ import {
   Trash2, WalletCards, X, TrendingDown, TrendingUp, PiggyBank, RefreshCw,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
+import { signInWithNativeAwarePasskey } from './lib/nativePasskeys'
 import Passwords from './Passwords'
 import Notes from './Notes'
 import PasskeyManager from './PasskeyManager'
@@ -47,7 +48,7 @@ function AuthScreen({ onSignedIn }) {
   async function signInWithDevice() {
     setPasskeyBusy(true); setError('')
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPasskey()
+      const { data, error: signInError } = await signInWithNativeAwarePasskey()
       if (signInError) throw signInError
       const allowed = import.meta.env.VITE_ALLOWED_EMAIL?.trim().toLowerCase()
       const signedInEmail = data.user?.email?.trim().toLowerCase()
