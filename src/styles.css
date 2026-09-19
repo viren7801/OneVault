@@ -2971,3 +2971,35 @@ body{overscroll-behavior-x:none}
     width: 100%;
   }
 }
+
+.brain-topbar-btn {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 11px;
+  border: 1px solid rgba(181,170,255,.16);
+  border-radius: 12px;
+  background: rgba(112,71,255,.07);
+  color: #b9b2ff;
+  font-size: 10px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: background .16s ease, border-color .16s ease, transform .16s ease, color .16s ease;
+}
+.brain-topbar-btn:hover {
+  color: #efedff;
+  border-color: rgba(181,170,255,.28);
+  background: rgba(112,71,255,.12);
+  transform: translateY(-1px);
+}
+.brain-topbar-btn:active { transform: translateY(0); }
+
+@media (max-width:760px) {
+  .brain-topbar-btn {
+    width: 38px;
+    padding: 0;
+    justify-content: center;
+  }
+  .brain-topbar-btn span { display: none; }
+}
