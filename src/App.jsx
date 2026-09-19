@@ -39,7 +39,7 @@ function AuthScreen({ onSignedIn }) {
     e.preventDefault(); setBusy(true); setError('')
     try {
       const allowed = import.meta.env.VITE_ALLOWED_EMAIL?.trim().toLowerCase()
-      if (allowed && email.trim().toLowerCase() !== allowed) throw new Error('This oneVault build is restricted to the owner account.')
+      if (allowed && email.trim().toLowerCase() !== allowed) throw new Error('This OneVault build is restricted to the owner account.')
       const { data, error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
       if (signInError) throw signInError
       await persistNativeSession(data.session)
@@ -57,7 +57,7 @@ function AuthScreen({ onSignedIn }) {
       const signedInEmail = data.user?.email?.trim().toLowerCase()
       if (allowed && signedInEmail !== allowed) {
         await supabase.auth.signOut({ scope: 'local' })
-        throw new Error('This passkey is not registered to the oneVault owner account.')
+        throw new Error('This passkey is not registered to the OneVault owner account.')
       }
       onSignedIn(data.user, false)
     } catch (err) {
@@ -66,8 +66,8 @@ function AuthScreen({ onSignedIn }) {
   }
 
   return <div className="auth-page"><div className="ambient ambient-one"/><div className="ambient ambient-two"/><div className="auth-card">
-    <div className="brand-row"><div className="brand-mark">1</div><div><div className="brand-title">oneVault</div><div className="brand-subtitle">Private personal workspace</div></div></div>
-    <div className="auth-icon"><ShieldCheck size={24}/></div><div className="panel-kicker">PRIVATE ACCESS</div><h1>Welcome back.</h1><p className="auth-copy">Sign in to your personal oneVault. There is no public registration.</p>
+    <div className="brand-row"><div className="brand-mark">1</div><div><div className="brand-title">OneVault</div><div className="brand-subtitle">Private personal workspace</div></div></div>
+    <div className="auth-icon"><ShieldCheck size={24}/></div><div className="panel-kicker">PRIVATE ACCESS</div><h1>Welcome back.</h1><p className="auth-copy">Sign in to your personal OneVault. There is no public registration.</p>
     <button type="button" className="device-login-btn" onClick={()=>void signInWithDevice()} disabled={passkeyBusy||busy}><Fingerprint size={17}/><span>{passkeyBusy?'Authenticating…':'Sign in with fingerprint / face unlock'}</span></button>
     <div className="auth-divider"><span>or use password</span></div>
     <form onSubmit={submit} className="auth-form"><label><span>Email</span><input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username" required/></label><label><span>Password</span><input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" required/></label>{error&&<div className="form-error">{error}</div>}<button className="primary-btn auth-submit" disabled={busy||passkeyBusy}>{busy?'Signing in…':'Sign in with password'}</button></form>
@@ -785,7 +785,7 @@ function Reminders({ user }) {
         <>
           <div className="telegram-connected-card">
             <MessageCircle size={18}/>
-            <div><strong>{telegramUsername ? `Connected as @${telegramUsername.replace(/^@/,'')}` : 'Telegram chat connected'}</strong><span>Telegram reminders can be delivered even when oneVault is closed.</span></div>
+            <div><strong>{telegramUsername ? `Connected as @${telegramUsername.replace(/^@/,'')}` : 'Telegram chat connected'}</strong><span>Telegram reminders can be delivered even when OneVault is closed.</span></div>
           </div>
           <div className="telegram-modal-actions">
             <button className="secondary-btn" onClick={checkTelegramConnection} disabled={telegramBusy}>{telegramBusy?'Checking…':'Check connection'}</button>
@@ -796,7 +796,7 @@ function Reminders({ user }) {
       ) : (
         <>
           <div className="telegram-steps">
-            <div><span>1</span><p>Open the oneVault Telegram bot.</p></div>
+            <div><span>1</span><p>Open the OneVault Telegram bot.</p></div>
             <div><span>2</span><p>Press <strong>Start</strong> in Telegram.</p></div>
             <div><span>3</span><p>Return here and press <strong>Check connection</strong>.</p></div>
           </div>
@@ -957,7 +957,7 @@ function App() {
     },
     {
       id: 'lock',
-      label: 'Lock oneVault',
+      label: 'Lock OneVault',
       description: 'Sign out on this device',
       icon: LockKeyhole,
       keywords: 'lock sign out logout',
@@ -1018,7 +1018,7 @@ function App() {
     }
   }, [])
 
-  if (authLoading) return <div className="loading-screen">Loading oneVault…</div>
+  if (authLoading) return <div className="loading-screen">Loading OneVault…</div>
 
   async function handleSignedIn(signedUser, offerDeviceSetup = false) {
     setUser(signedUser)
@@ -1050,7 +1050,7 @@ function App() {
   }
 
   return <div className="app-shell"><div className="ambient ambient-one"/><div className="ambient ambient-two"/>
-    <aside className={`sidebar ${mobileOpen?'open':''}`}><div className="brand-row"><div className="brand-mark">1</div><div><div className="brand-title">oneVault</div><div className="brand-subtitle">Personal workspace</div></div><button className="icon-btn mobile-close" onClick={()=>setMobileOpen(false)}><X size={18}/></button></div>
+    <aside className={`sidebar ${mobileOpen?'open':''}`}><div className="brand-row"><div className="brand-mark">1</div><div><div className="brand-title">OneVault</div><div className="brand-subtitle">Personal workspace</div></div><button className="icon-btn mobile-close" onClick={()=>setMobileOpen(false)}><X size={18}/></button></div>
       <nav className="module-nav"><div className="nav-label">YOUR SPACE</div>{modules.map(m=>{const Icon=m.icon;return <button key={m.id} className={`module-btn ${active===m.id?'selected':''}`} onClick={()=>{setActive(m.id);setMobileOpen(false)}}><span className="module-icon"><Icon size={19}/></span><span className="module-copy"><strong>{m.label}</strong><small>{m.description}</small></span><ChevronRight size={15} className="module-arrow"/></button>})}</nav>
       <div className="sidebar-footer"><div className="privacy-card"><ShieldCheck size={18}/><div><strong>Private mode</strong><span>Owner-only database access.</span></div></div><button className="device-security-btn" onClick={()=>setShowPasskeyManager(true)}><Fingerprint size={15}/> Security</button><button className="logout-btn" onClick={signOut}><LogOut size={16}/> Sign out</button></div>
     </aside>
@@ -1073,7 +1073,7 @@ function App() {
       <div className="command-palette" onMouseDown={event=>event.stopPropagation()}>
         <div className="command-search-row">
           <Search size={17}/>
-          <input ref={commandInputRef} value={commandQuery} onChange={event=>setCommandQuery(event.target.value)} placeholder="Search oneVault…" aria-label="Search oneVault" />
+          <input ref={commandInputRef} value={commandQuery} onChange={event=>setCommandQuery(event.target.value)} placeholder="Search OneVault…" aria-label="Search OneVault" />
           <kbd>ESC</kbd>
         </div>
         <div className="command-list">
