@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import {
-  Bell, Check, ChevronRight, CircleDollarSign, CreditCard, Edit3, Filter, Fingerprint, LayoutDashboard, MessageCircle,
-  LockKeyhole, LogOut, Menu, NotebookPen, Plus, Search, ShieldCheck,
+  Bell, Bookmark, CalendarDays, Check, ChevronDown, ChevronRight, CircleDollarSign, CreditCard, Edit3, Filter, Fingerprint,
+  LayoutDashboard, MessageCircle, LockKeyhole, LogOut, Menu, NotebookPen, Plus, RotateCcw, Search, ShieldCheck,
+  SlidersHorizontal, ArrowUpDown,
   Trash2, WalletCards, X, TrendingDown, TrendingUp, PiggyBank, RefreshCw, ScanLine, ImagePlus, Loader2,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
@@ -329,26 +330,78 @@ function Pocket({ user, onQuickAdd }) {
   const [budgets, setBudgets] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState({
+    query: '',
+    type: 'all',
+    accounts: [],
+    categories: [],
+    dateFrom: '',
+    dateTo: '',
+    amountMin: '',
+    amountMax: '',
+    sort: 'newest',
+  })
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [savedSearches, setSavedSearches] = useState([])
+  const [savedSearchMenuOpen, setSavedSearchMenuOpen] = useState(false)
   const [accountModal, setAccountModal] = useState(null)
   const [budgetModal, setBudgetModal] = useState(null)
   const [editing, setEditing] = useState(null)
   const [transactionModal, setTransactionModal] = useState(null)
   const [scanReceiptOpen, setScanReceiptOpen] = useState(false)
+  const searchInputRef = useRef(null)
 
   async function load() {
-    setLoading(true); setError('')
-    const start = monthStart(-6).toISOString()
-    const [tx, ac, bu] = await Promise.all([
-      supabase.from('expenses').select('*').gte('spent_at', start).order('spent_at', { ascending: false }).limit(500),
+    setLoading(true)
+    setError('')
+
+    const pageSize = 500
+    const transactionRows = []
+    let transactionError = null
+
+    for (let offset = 0; ; offset += pageSize) {
+      const response = await supabase
+        .from('expenses')
+        .select('*')
+        .order('spent_at', { ascending: false })
+        .range(offset, offset + pageSize - 1)
+
+      if (response.error) {
+        transactionError = response.error
+        break
+      }
+
+      const page = response.data || []
+      transactionRows.push(...page)
+      if (page.length < pageSize) break
+    }
+
+    const [ac, bu] = await Promise.all([
       supabase.from('accounts').select('*').order('created_at', { ascending: true }),
       supabase.from('budgets').select('*').eq('month', `${monthKey(new Date())}-01`).order('category'),
     ])
-    if (tx.error || ac.error || bu.error) setError(tx.error?.message || ac.error?.message || bu.error?.message || 'Unable to load Pocket data.')
-    setTransactions(tx.data || []); setAccounts(ac.data || []); setBudgets(bu.data || []); setLoading(false)
+
+    const firstError = transactionError || ac.error || bu.error
+    if (firstError) {
+      setError(firstError.message || 'Unable to load Pocket data.')
+    }
+
+    setTransactions(transactionRows)
+    setAccounts(ac.data || [])
+    setBudgets(bu.data || [])
+    setLoading(false)
   }
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    try {
+      const key = `onevault:pocket-searches:${user.id}`
+      const stored = JSON.parse(window.localStorage.getItem(key) || '[]')
+      setSavedSearches(Array.isArray(stored) ? stored.slice(0, 20) : [])
+    } catch {
+      setSavedSearches([])
+    }
+  }, [user.id])
   useEffect(() => {
     function handleOpen(event) { setTransactionModal({ type: event.detail || 'expense' }) }
     function handleReceiptScan() { setScanReceiptOpen(true) }
@@ -365,20 +418,158 @@ function Pocket({ user, onQuickAdd }) {
   const income = useMemo(() => current.filter(x=>x.type==='income').reduce((s,x)=>s+Number(x.amount),0), [current])
   const expenses = useMemo(() => current.filter(x=>x.type==='expense').reduce((s,x)=>s+Number(x.amount),0), [current])
   const balance = income - expenses
+
+  const accountById = useMemo(() => Object.fromEntries(accounts.map(account => [account.id, account])), [accounts])
+
+  const parseSearchTokens = (value) => {
+    const tokens = []
+    const matcher = /"([^"]+)"|\S+/g
+    let match
+    while ((match = matcher.exec(value || ''))) {
+      const token = (match[1] || match[0]).trim()
+      if (token) tokens.push(token)
+    }
+    return tokens
+  }
+
+  const localDateKey = (value) => {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
+  }
+
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return transactions.filter(x => {
-      const matchesType = filter === 'all' || x.type === filter
-      const matchesQuery = !q || `${x.description || ''} ${x.category}`.toLowerCase().includes(q)
-      return matchesType && matchesQuery
-    }).slice(0, 120)
-  }, [transactions, query, filter])
+    const tokens = parseSearchTokens(search.query.toLowerCase())
+    const includeTokens = tokens.filter(token => !token.startsWith('-')).map(token => token.replace(/^\+/, ''))
+    const excludeTokens = tokens.filter(token => token.startsWith('-')).map(token => token.slice(1)).filter(Boolean)
+
+    const minAmount = Number(search.amountMin)
+    const maxAmount = Number(search.amountMax)
+
+    return transactions
+      .filter(transaction => {
+        if (search.type !== 'all' && transaction.type !== search.type) return false
+        if (search.accounts.length && !search.accounts.includes(transaction.account_id || 'none')) return false
+        if (search.categories.length && !search.categories.includes(transaction.category)) return false
+
+        const transactionDate = localDateKey(transaction.spent_at)
+        if (search.dateFrom && transactionDate < search.dateFrom) return false
+        if (search.dateTo && transactionDate > search.dateTo) return false
+
+        const amount = Number(transaction.amount) || 0
+        if (search.amountMin !== '' && Number.isFinite(minAmount) && amount < minAmount) return false
+        if (search.amountMax !== '' && Number.isFinite(maxAmount) && amount > maxAmount) return false
+
+        if (includeTokens.length || excludeTokens.length) {
+          const accountName = accountById[transaction.account_id]?.name || ''
+          const haystack = `${transaction.description || ''} ${transaction.category || ''} ${accountName}`.toLowerCase()
+
+          if (!includeTokens.every(token => haystack.includes(token))) return false
+          if (excludeTokens.some(token => haystack.includes(token))) return false
+        }
+
+        return true
+      })
+      .sort((a, b) => {
+        if (search.sort === 'oldest') return new Date(a.spent_at) - new Date(b.spent_at)
+        if (search.sort === 'highest') return Number(b.amount) - Number(a.amount)
+        if (search.sort === 'lowest') return Number(a.amount) - Number(b.amount)
+        if (search.sort === 'az') return String(a.description || a.category || '').localeCompare(String(b.description || b.category || ''))
+        return new Date(b.spent_at) - new Date(a.spent_at)
+      })
+  }, [transactions, search, accountById])
+
+  const activeSearchFilterCount = useMemo(() => {
+    let count = 0
+    if (search.query.trim()) count += 1
+    if (search.type !== 'all') count += 1
+    if (search.accounts.length) count += 1
+    if (search.categories.length) count += 1
+    if (search.dateFrom || search.dateTo) count += 1
+    if (search.amountMin !== '' || search.amountMax !== '') count += 1
+    return count
+  }, [search])
+
+  const filteredIncome = useMemo(() => filtered.filter(x => x.type === 'income').reduce((sum, x) => sum + Number(x.amount), 0), [filtered])
+  const filteredExpenses = useMemo(() => filtered.filter(x => x.type === 'expense').reduce((sum, x) => sum + Number(x.amount), 0), [filtered])
 
   const categoryTotals = useMemo(() => categories.map(category => ({ category, total: current.filter(x=>x.type==='expense' && x.category===category).reduce((s,x)=>s+Number(x.amount),0) })).filter(x=>x.total>0).sort((a,b)=>b.total-a.total), [current])
   const maxCategory = Math.max(1, ...categoryTotals.map(x=>x.total))
   const sixMonths = useMemo(() => Array.from({ length: 6 }, (_, i) => { const d = monthStart(i-5); const key=monthKey(d); return { key, label:d.toLocaleDateString('en-IN',{month:'short'}), total:transactions.filter(x=>x.type==='expense' && monthKey(x.spent_at)===key).reduce((s,x)=>s+Number(x.amount),0) } }), [transactions])
   const maxSix = Math.max(1, ...sixMonths.map(x=>x.total))
 
+  function updateSearch(patch) {
+    setSearch(previous => ({ ...previous, ...patch }))
+  }
+
+  function toggleSearchArray(field, value) {
+    setSearch(previous => ({
+      ...previous,
+      [field]: previous[field].includes(value)
+        ? previous[field].filter(item => item !== value)
+        : [...previous[field], value],
+    }))
+  }
+
+  function clearSearch() {
+    setSearch({ query:'', type:'all', accounts:[], categories:[], dateFrom:'', dateTo:'', amountMin:'', amountMax:'', sort:'newest' })
+  }
+
+  function applyDatePreset(preset) {
+    const now = new Date()
+    const today = localDateKey(now)
+    if (preset === 'all') return updateSearch({ dateFrom:'', dateTo:'' })
+    if (preset === 'today') return updateSearch({ dateFrom:today, dateTo:today })
+    if (preset === '7d') { const from = new Date(now); from.setDate(from.getDate() - 6); return updateSearch({ dateFrom:localDateKey(from), dateTo:today }) }
+    if (preset === 'month') { const from = new Date(now.getFullYear(), now.getMonth(), 1); return updateSearch({ dateFrom:localDateKey(from), dateTo:today }) }
+    if (preset === 'last-month') { const from = new Date(now.getFullYear(), now.getMonth()-1, 1); const to = new Date(now.getFullYear(), now.getMonth(), 0); return updateSearch({ dateFrom:localDateKey(from), dateTo:localDateKey(to) }) }
+    if (preset === 'year') { const from = new Date(now.getFullYear(), 0, 1); return updateSearch({ dateFrom:localDateKey(from), dateTo:today }) }
+  }
+
+  function snapshotSearch() {
+    return { ...search, accounts:[...search.accounts], categories:[...search.categories] }
+  }
+
+  function persistSavedSearches(next) {
+    const trimmed = next.slice(0, 20)
+    setSavedSearches(trimmed)
+    window.localStorage.setItem(`onevault:pocket-searches:${user.id}`, JSON.stringify(trimmed))
+  }
+
+  function saveCurrentSearch() {
+    const defaultName = search.query.trim() || 'Pocket search'
+    const name = window.prompt('Name this saved search', defaultName)
+    if (!name?.trim()) return
+    persistSavedSearches([{ id:crypto.randomUUID(), name:name.trim().slice(0,40), ...snapshotSearch(), createdAt:new Date().toISOString() }, ...savedSearches])
+    setSavedSearchMenuOpen(true)
+  }
+
+  function applySavedSearch(view) {
+    setSearch({
+      query:view.query||'', type:view.type||'all',
+      accounts:Array.isArray(view.accounts)?view.accounts:[], categories:Array.isArray(view.categories)?view.categories:[],
+      dateFrom:view.dateFrom||'', dateTo:view.dateTo||'', amountMin:view.amountMin||'', amountMax:view.amountMax||'', sort:view.sort||'newest'
+    })
+    setSearchOpen(true)
+    setSavedSearchMenuOpen(false)
+    window.setTimeout(() => searchInputRef.current?.focus(), 60)
+  }
+
+  function updateSavedSearch(viewId) {
+    persistSavedSearches(savedSearches.map(view => view.id===viewId ? { ...view, ...snapshotSearch(), updatedAt:new Date().toISOString() } : view))
+  }
+
+  function renameSavedSearch(viewId) {
+    const current = savedSearches.find(view => view.id===viewId)
+    if (!current) return
+    const name = window.prompt('Rename saved search', current.name)
+    if (!name?.trim()) return
+    persistSavedSearches(savedSearches.map(view => view.id===viewId ? { ...view, name:name.trim().slice(0,40) } : view))
+  }
+
+  function deleteSavedSearch(viewId) {
+    persistSavedSearches(savedSearches.filter(view => view.id!==viewId))
+  }
   async function adjustBalance(accountId, delta) {
     if (!accountId || !delta) return
     const account = accounts.find(a=>a.id===accountId)
@@ -447,8 +638,38 @@ function Pocket({ user, onQuickAdd }) {
     <div className="pocket-chart-grid"><section className="panel chart-panel"><div className="panel-header"><div><div className="panel-kicker">SPENDING</div><h3>Last 6 months</h3></div></div><div className="bar-chart">{sixMonths.map(item=><div className="bar-col" key={item.key}><div className="bar-value">{item.total ? money(item.total) : '—'}</div><div className="bar-track"><div className="bar-fill" style={{height:`${Math.max(6,(item.total/maxSix)*100)}%`}}/></div><span>{item.label}</span></div>)}</div></section>
       <section className="panel chart-panel"><div className="panel-header"><div><div className="panel-kicker">THIS MONTH</div><h3>By category</h3></div></div><div className="category-bars">{categoryTotals.length===0?<div className="small-muted">No expenses recorded this month.</div>:categoryTotals.slice(0,6).map(item=><div className="category-row" key={item.category}><div><span>{item.category}</span><strong>{money(item.total)}</strong></div><div className="category-track"><div className="category-fill" style={{width:`${(item.total/maxCategory)*100}%`}}/></div></div>)}</div></section></div>
 
-    <div className="pocket-columns"><section className="panel transactions-panel"><div className="panel-header"><div><div className="panel-kicker">TRANSACTIONS</div><h3>History</h3></div><span className="results-count">{filtered.length} shown</span></div><div className="transaction-filters"><div className="search-box"><Search size={15}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search description or category"/></div><div className="filter-tabs"><button className={filter==='all'?'active':''} onClick={()=>setFilter('all')}>All</button><button className={filter==='expense'?'active':''} onClick={()=>setFilter('expense')}>Expenses</button><button className={filter==='income'?'active':''} onClick={()=>setFilter('income')}>Income</button></div><Filter size={15} className="filter-icon"/></div>
-      {filtered.length===0?<div className="empty-state compact-empty"><div className="empty-icon"><WalletCards size={22}/></div><h4>No matching transactions</h4><p>Try another search or add a new transaction.</p><button className="primary-btn" onClick={()=>onQuickAdd('expense')}><Plus size={16}/> Add transaction</button></div>:<div className="transaction-table"><div className="tx-head"><span>Transaction</span><span>Account</span><span>Date</span><span>Amount</span><span/></div>{filtered.map(tx=>{const account=accounts.find(a=>a.id===tx.account_id);return <div className="tx-row" key={tx.id}><div className="tx-main"><div className={`tx-icon ${tx.type}`}><CircleDollarSign size={16}/></div><div><strong>{tx.description||tx.category}</strong><small>{tx.category}</small></div></div><span>{account?.name || '—'}</span><span>{new Date(tx.spent_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short'})}</span><strong className={tx.type==='income'?'income-text':'expense-text'}>{tx.type==='income'?'+':'-'}{money(tx.amount)}</strong><div className="row-actions"><button className="icon-btn" onClick={()=>setEditing(tx)}><Edit3 size={14}/></button><button className="icon-btn danger-btn" onClick={()=>deleteTransaction(tx)}><Trash2 size={14}/></button></div></div>})}</div>}
+    <div className="pocket-columns"><section className="panel transactions-panel"><div className="panel-header"><div><div className="panel-kicker">TRANSACTIONS</div><h3>History</h3></div><span className="results-count">{filtered.length} shown</span></div><div className="transaction-filters advanced-transaction-filters">
+        <div className="search-box search-box-lg">
+          <Search size={15}/>
+          <input ref={searchInputRef} value={search.query} onChange={e=>updateSearch({query:e.target.value})} onFocus={()=>setSearchOpen(true)} placeholder="Search description, category, account…"/>
+          {search.query && <button type="button" className="search-clear-btn" onClick={()=>updateSearch({query:''})}><X size={13}/></button>}
+        </div>
+        <button className={`search-control-btn ${searchOpen || activeSearchFilterCount ? 'active' : ''}`} onClick={()=>setSearchOpen(value=>!value)} type="button"><SlidersHorizontal size={14}/> Advanced {activeSearchFilterCount>0&&<span className="search-count-badge">{activeSearchFilterCount}</span>}</button>
+        <div className="saved-search-wrap">
+          <button className={`search-control-btn ${savedSearchMenuOpen?'active':''}`} onClick={()=>setSavedSearchMenuOpen(value=>!value)} type="button"><Bookmark size={14}/> Saved {savedSearches.length>0&&<span className="search-count-badge">{savedSearches.length}</span>}</button>
+          {savedSearchMenuOpen&&<div className="saved-search-menu">
+            <div className="saved-search-menu-head"><div><strong>Saved searches</strong><small>Up to 20 personal views</small></div><button className="icon-btn" onClick={()=>setSavedSearchMenuOpen(false)}><X size={14}/></button></div>
+            <button className="saved-search-save" onClick={saveCurrentSearch}><Bookmark size={14}/> Save current search</button>
+            {savedSearches.length===0?<div className="saved-search-empty">Save filters you use often.</div>:savedSearches.map(view=><div className="saved-search-row" key={view.id}><button className="saved-search-main" onClick={()=>applySavedSearch(view)}><span><strong>{view.name}</strong><small>{view.query||'No text search'} · {view.type==='all'?'All types':view.type}</small></span><ChevronRight size={14}/></button><button className="mini-btn" title="Update from current search" onClick={()=>updateSavedSearch(view.id)}><RefreshCw size={12}/></button><button className="mini-btn" title="Rename" onClick={()=>renameSavedSearch(view.id)}><Edit3 size={12}/></button><button className="mini-btn danger" title="Delete" onClick={()=>deleteSavedSearch(view.id)}><Trash2 size={12}/></button></div>)}
+          </div>}
+        </div>
+        <select className="search-sort-select" value={search.sort} onChange={e=>updateSearch({sort:e.target.value})} title="Sort search results">
+          <option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="highest">Highest amount</option><option value="lowest">Lowest amount</option><option value="az">A–Z</option>
+        </select>
+      </div>
+      {searchOpen&&<div className="advanced-search-panel">
+        <div className="advanced-search-head"><div><div className="panel-kicker">ADVANCED SEARCH</div><h4>Find any Pocket transaction</h4><p>Search your full Pocket history, combine filters, and save the view.</p></div><div className="advanced-search-actions"><button className="secondary-btn" type="button" onClick={clearSearch}><RotateCcw size={13}/> Reset</button><button className="primary-btn" type="button" onClick={saveCurrentSearch}><Bookmark size={13}/> Save search</button></div></div>
+        <div className="search-section"><div className="search-section-title"><span>Transaction type</span><small>Choose one</small></div><div className="search-segmented">{[['all','All'],['expense','Expenses'],['income','Income']].map(([value,label])=><button key={value} type="button" className={search.type===value?'active':''} onClick={()=>updateSearch({type:value})}>{label}</button>)}</div></div>
+        <div className="search-section"><div className="search-section-title"><span>Date range</span><small>Fast presets or custom</small></div><div className="search-presets">{[['all','All time'],['today','Today'],['7d','Last 7 days'],['month','This month'],['last-month','Last month'],['year','This year']].map(([value,label])=><button key={value} type="button" className="search-preset" onClick={()=>applyDatePreset(value)}>{label}</button>)}</div><div className="search-date-grid"><label><span><CalendarDays size={12}/> From</span><input type="date" value={search.dateFrom} onChange={e=>updateSearch({dateFrom:e.target.value})}/></label><label><span><CalendarDays size={12}/> To</span><input type="date" value={search.dateTo} onChange={e=>updateSearch({dateTo:e.target.value})}/></label></div></div>
+        <div className="search-two-col">
+          <div className="search-section"><div className="search-section-title"><span>Accounts</span><small>{search.accounts.length?`${search.accounts.length} selected`:'All accounts'}</small></div><div className="search-check-grid">{accounts.map(account=><button type="button" key={account.id} className={`search-check ${search.accounts.includes(account.id)?'selected':''}`} onClick={()=>toggleSearchArray('accounts',account.id)}><span>{search.accounts.includes(account.id)?<Check size={12}/>:null}</span><strong>{account.name}</strong></button>)}<button type="button" className={`search-check ${search.accounts.includes('none')?'selected':''}`} onClick={()=>toggleSearchArray('accounts','none')}><span>{search.accounts.includes('none')?<Check size={12}/>:null}</span><strong>No account</strong></button></div></div>
+          <div className="search-section"><div className="search-section-title"><span>Categories</span><small>{search.categories.length?`${search.categories.length} selected`:'All categories'}</small></div><div className="search-check-grid">{categories.map(category=><button type="button" key={category} className={`search-check ${search.categories.includes(category)?'selected':''}`} onClick={()=>toggleSearchArray('categories',category)}><span>{search.categories.includes(category)?<Check size={12}/>:null}</span><strong>{category}</strong></button>)}</div></div>
+        </div>
+        <div className="search-section"><div className="search-section-title"><span>Amount range</span><small>Leave blank for any amount</small></div><div className="search-amount-grid"><label><span>Minimum</span><div className="search-amount-input"><b>₹</b><input inputMode="decimal" placeholder="0" value={search.amountMin} onChange={e=>updateSearch({amountMin:e.target.value})}/></div></label><label><span>Maximum</span><div className="search-amount-input"><b>₹</b><input inputMode="decimal" placeholder="No limit" value={search.amountMax} onChange={e=>updateSearch({amountMax:e.target.value})}/></div></label></div></div>
+        <div className="search-query-help"><span>Power search:</span><code>"exact phrase"</code><code>-exclude</code><span>All words must match somewhere in description, category, or account.</span></div>
+      </div>}
+      <div className="search-result-summary"><div><strong>{filtered.length.toLocaleString('en-IN')}</strong><span>matching transactions</span></div><div className="search-result-totals"><span>Income <b className="income-text">{money(filteredIncome)}</b></span><span>Expense <b className="expense-text">{money(filteredExpenses)}</b></span></div>{activeSearchFilterCount>0&&<button className="text-btn" onClick={clearSearch}>Clear all</button>}</div>
+      {filtered.length===0?<div className="empty-state compact-empty"><div className="empty-icon"><WalletCards size={22}/></div><h4>No matching transactions</h4><p>Try adjusting the text, date range, amount or account filters.</p><button className="primary-btn" onClick={()=>onQuickAdd('expense')}><Plus size={16}/> Add transaction</button></div>:<div className="transaction-table"><div className="tx-head"><span>Transaction</span><span>Account</span><span>Date</span><span>Amount</span><span/></div>{filtered.map(tx=>{const account=accountById[tx.account_id];return <div className="tx-row" key={tx.id}><div className="tx-main"><div className={`tx-icon ${tx.type}`}><CircleDollarSign size={16}/></div><div><strong>{tx.description||tx.category}</strong><small>{tx.category}</small></div></div><span>{account?.name||'—'}</span><span>{new Date(tx.spent_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short'})}</span><strong className={tx.type==='income'?'income-text':'expense-text'}>{tx.type==='income'?'+':'-'}{money(tx.amount)}</strong><div className="row-actions"><button className="icon-btn" onClick={()=>setEditing(tx)}><Edit3 size={14}/></button><button className="icon-btn danger-btn" onClick={()=>deleteTransaction(tx)}><Trash2 size={14}/></button></div></div>})}</div>})}</div>}
     </section>
 
     <aside className="pocket-side"><section className="panel accounts-panel"><div className="panel-header"><div><div className="panel-kicker">ACCOUNTS</div><h3>Your money</h3></div><button className="icon-btn" onClick={()=>setAccountModal({})}><Plus size={16}/></button></div>{accounts.length===0?<div className="side-empty">Add a bank, cash wallet or card.</div>:<div className="account-list">{accounts.map(account=><div className="account-row" key={account.id}><div className="module-icon"><CreditCard size={16}/></div><div><strong>{account.name}</strong><small>{account.type}</small></div><div className="account-right"><strong>{money(account.balance)}</strong><div><button onClick={()=>setAccountModal(account)} className="mini-btn"><Edit3 size={12}/></button><button onClick={()=>deleteAccount(account)} className="mini-btn danger"><Trash2 size={12}/></button></div></div></div>)}</div>}</section>
