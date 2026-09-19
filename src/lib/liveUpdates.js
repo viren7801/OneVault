@@ -2,7 +2,8 @@ import { Capacitor } from '@capacitor/core'
 
 const MANIFEST_URL = '/live-updates/latest.json'
 const STATUS_TIMEOUT_MS = 7000
-const READY_TIMEOUT_MS = 3500
+const READY_TIMEOUT_MS = 10000
+const NEXT_BUNDLE_TIMEOUT_MS = 3000
 const DOWNLOAD_TIMEOUT_MS = 90000
 
 let liveUpdatePromise
@@ -77,15 +78,16 @@ async function fetchManifest() {
   }
 }
 
-async function callLiveUpdate(methodName, ...args) {
+async function callLiveUpdate(methodName, timeoutMs = STATUS_TIMEOUT_MS, ...args) {
   const liveUpdate = await getLiveUpdatePlugin()
+
   if (!liveUpdate || typeof liveUpdate[methodName] !== 'function') {
     throw new Error('Live updates are unavailable in this build.')
   }
 
   return withTimeout(
     liveUpdate[methodName](...args),
-    STATUS_TIMEOUT_MS,
+    timeoutMs,
     'Live update service is taking too long to respond.',
   )
 }
@@ -105,8 +107,6 @@ export async function initializeLiveUpdates() {
     })
   }
 
-  // Startup readiness must never block the UI or the manual update checker.
-  void readyPromise
   return readyPromise
 }
 
@@ -117,13 +117,15 @@ export async function getLiveUpdateStatus() {
     return {
       supported: false,
       available: false,
+      staged: false,
       currentBundleId: null,
       nextBundleId: null,
       latestBundleId: null,
     }
   }
 
-  // Readiness is a startup concern. Do not block the manual update checker on it.
+  // The plugin readiness call is independent from the manual status check.
+  // Starting it in the background prevents the UI from hanging on ready().
   void initializeLiveUpdates()
 
   const [manifest, current] = await Promise.all([
@@ -132,12 +134,15 @@ export async function getLiveUpdateStatus() {
   ])
 
   const currentBundleId = current?.bundleId || null
-  const available = Boolean(manifest.bundleId && manifest.bundleId !== currentBundleId)
+  const available = Boolean(
+    manifest.bundleId &&
+    manifest.bundleId !== currentBundleId,
+  )
 
   return {
     supported: true,
     available,
-    staged,
+    staged: false,
     currentBundleId,
     nextBundleId: null,
     latestBundleId: manifest.bundleId,
@@ -148,19 +153,36 @@ export async function getLiveUpdateStatus() {
 
 export async function installLatestLiveUpdate(onProgress) {
   const liveUpdate = await getLiveUpdatePlugin()
+
   if (!liveUpdate) {
     throw new Error('Live updates are only available in the native OneVault app.')
   }
 
-  // Do not wait for plugin readiness here. It is already kicked off at startup.
   void initializeLiveUpdates()
 
   const manifest = await fetchManifest()
   const current = await callLiveUpdate('getCurrentBundle')
 
   if (manifest.bundleId === current?.bundleId) {
-    return { updated: false, bundleId: manifest.bundleId }
+    return {
+      updated: false,
+      bundleId: manifest.bundleId,
+    }
   }
+
+  let nextBundleId = null
+
+  try {
+    const next = await callLiveUpdate(
+      'getNextBundle',
+      NEXT_BUNDLE_TIMEOUT_MS,
+    )
+    nextBundleId = next?.bundleId || null
+  } catch {
+    // A slow native next-bundle lookup should not prevent an update.
+  }
+
+  if (nextBundleId !== manifest.bundleId) {
     const listener = await liveUpdate.addListener('downloadBundleProgress', event => {
       if (event?.bundleId !== manifest.bundleId) return
       const progress = Math.max(0, Math.min(1, Number(event.progress) || 0))
@@ -181,13 +203,13 @@ export async function installLatestLiveUpdate(onProgress) {
     } finally {
       await listener.remove().catch(() => {})
     }
-
-    await withTimeout(
-      liveUpdate.setNextBundle({ bundleId: manifest.bundleId }),
-      STATUS_TIMEOUT_MS,
-      'Could not stage the downloaded update.',
-    )
   }
+
+  await withTimeout(
+    liveUpdate.setNextBundle({ bundleId: manifest.bundleId }),
+    STATUS_TIMEOUT_MS,
+    'Could not stage the downloaded update.',
+  )
 
   onProgress?.(1)
 
