@@ -3,7 +3,7 @@ import { Capacitor } from '@capacitor/core'
 import {
   Bell, Bookmark, CalendarDays, Check, ChevronRight, CircleDollarSign, CreditCard, Edit3, Fingerprint,
   LayoutDashboard, MessageCircle, LockKeyhole, LogOut, Menu, NotebookPen, Plus, RotateCcw, Search, ShieldCheck,
-  SlidersHorizontal,
+  SlidersHorizontal, Sparkles,
   Trash2, WalletCards, X, TrendingDown, TrendingUp, PiggyBank, RefreshCw, ScanLine, ImagePlus, Loader2,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
