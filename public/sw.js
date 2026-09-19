@@ -1,7 +1,8 @@
-const CACHE_NAME = 'onevault-shell-v1'
+const CACHE_NAME = 'onevault-shell-v2'
 const CORE_ASSETS = [
   '/',
   '/manifest.webmanifest',
+  '/fold.css',
   '/icons/onevault-icon.svg',
 ]
 
