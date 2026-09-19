@@ -83,7 +83,7 @@ function relativeDate(date) {
   return value.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }
 
-export default function NotificationsCenter({ user, open, onClose, onNavigate }) {
+export default function NotificationsCenter({ user, open, onOpen, onClose, onNavigate }) {
   const [items, setItems] = useState([])
   const [prefs, setPrefs] = useState(() => loadPrefs(user.id))
   const [readIds, setReadIds] = useState(() => loadReadIds(user.id))
@@ -331,7 +331,7 @@ export default function NotificationsCenter({ user, open, onClose, onNavigate })
     <>
       <button
         className="notification-topbar-btn"
-        onClick={() => void onClose?.()}
+        onClick={() => void onOpen?.()}
         aria-label="Notifications"
         title="Notifications"
       >
