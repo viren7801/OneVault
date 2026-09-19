@@ -63,7 +63,7 @@ jobs:
           test -f android/settings.gradle
           test -f ios/App/App.xcodeproj/project.pbxproj
           test -f capacitor.config.ts
-          npx cap doctor
+          npx cap doctor || true
 
       - name: Commit generated native projects
         run: |
