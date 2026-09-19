@@ -1,5 +1,6 @@
 import React from 'react';
 import { Capacitor } from '@capacitor/core';
+import { LiveUpdate } from '@capawesome/capacitor-live-update';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './styles.css';
@@ -43,5 +44,21 @@ createRoot(document.getElementById('root')).render(
 );
 
 window.addEventListener('load', () => {
-  void initializeLiveUpdates();
+  void initializeLiveUpdates().then(async () => {
+    if (!Capacitor.isNativePlatform() || !Capacitor.isPluginAvailable('LiveUpdate')) return
+
+    const listener = await LiveUpdate.addListener('nextBundleSet', ({ bundleId }) => {
+      if (!bundleId) return
+      console.info('[OneVault] live update ready:', bundleId)
+      window.setTimeout(() => {
+        void LiveUpdate.reload()
+      }, 1200)
+    })
+
+    window.addEventListener('beforeunload', () => {
+      void listener.remove()
+    }, { once: true })
+  }).catch(() => {
+    // The app remains usable when live-update initialization is unavailable.
+  })
 });
