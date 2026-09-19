@@ -1,10 +1,24 @@
-const CACHE_NAME = 'onevault-shell-v2'
+const CACHE_NAME = 'onevault-shell-v3'
 const CORE_ASSETS = [
   '/',
   '/manifest.webmanifest',
   '/fold.css',
   '/icons/onevault-icon.svg',
 ]
+
+function isDevelopmentRequest(request) {
+  const url = new URL(request.url)
+  return (
+    url.port === '5173' ||
+    url.pathname.startsWith('/@vite/') ||
+    url.pathname.startsWith('/@react-refresh') ||
+    url.pathname.startsWith('/src/') ||
+    url.pathname.startsWith('/node_modules/') ||
+    url.pathname.endsWith('.js') ||
+    url.pathname.endsWith('.css') ||
+    url.pathname.endsWith('.map')
+  )
+}
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -28,6 +42,7 @@ self.addEventListener('fetch', event => {
   if (request.method !== 'GET') return
   if (request.url.includes('/rest/v1/') || request.url.includes('/auth/v1/') || request.url.includes('/functions/v1/')) return
   if (new URL(request.url).origin !== self.location.origin) return
+  if (isDevelopmentRequest(request)) return
 
   if (request.mode === 'navigate') {
     event.respondWith(
