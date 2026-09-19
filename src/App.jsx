@@ -6,7 +6,7 @@ import {
   Trash2, WalletCards, X, TrendingDown, TrendingUp, PiggyBank, RefreshCw,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
-import { clearNativeSession, persistNativeSession, signInWithNativeAwarePasskey } from './lib/nativePasskeys'
+import { clearNativeSession, getNativeDeviceStatus, persistNativeSession, signInWithNativeAwarePasskey } from './lib/nativePasskeys'
 import UpdateCenter from './UpdateCenter'
 import Passwords from './Passwords'
 import Notes from './Notes'
@@ -895,25 +895,43 @@ function App() {
 
     async function bootstrapAuth() {
       try {
-        const { data, error } = await supabase.auth.getSession()
-        if (!mounted) return
-
-        // An auth event already won the race. Never overwrite it with the
-        // snapshot returned by getSession().
-        if (authEventDuringBootstrap) return
-
+        // Native builds keep the real session in Android/iOS secure storage.
+        // On launch, automatically offer the registered device unlock so an
+        // app restart or Live Update does not look like the device was logged out.
         if (Capacitor.isNativePlatform()) {
-          // A JavaScript session can be left over from the previous webview
-          // lifetime. Move it to secure storage and clear it so the native
-          // login screen always requires device authentication.
+          const device = await getNativeDeviceStatus()
+
+          if (!mounted || authEventDuringBootstrap) return
+
+          if (device.registered) {
+            const unlockResult = await signInWithNativeAwarePasskey()
+
+            if (!mounted || authEventDuringBootstrap) return
+
+            if (unlockResult?.data?.user && !unlockResult?.error) {
+              setUser(unlockResult.data.user)
+              return
+            }
+          }
+
+          // Clean up any stale WebView-only session without deleting the
+          // protected device session used by fingerprint/face unlock.
+          const { data, error } = await supabase.auth.getSession()
+
+          if (!mounted || authEventDuringBootstrap) return
+
           if (!error && data.session) {
             await persistNativeSession(data.session)
             if (mounted) await supabase.auth.signOut({ scope: 'local' })
           }
+
           if (mounted) setUser(null)
-        } else {
-          setUser(data.session?.user || null)
+          return
         }
+
+        const { data } = await supabase.auth.getSession()
+        if (!mounted || authEventDuringBootstrap) return
+        setUser(data.session?.user || null)
       } catch (bootstrapError) {
         console.warn('[OneVault] auth bootstrap failed:', bootstrapError?.message || bootstrapError)
         if (mounted) setUser(null)
