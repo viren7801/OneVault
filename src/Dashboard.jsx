@@ -43,6 +43,7 @@ export default function Dashboard({ user, onNavigate, onQuickAdd, onOpenSecurity
   const [todayReminders, setTodayReminders] = useState([])
   const [passkeys, setPasskeys] = useState(0)
   const [vaultStatus, setVaultStatus] = useState({ passwords: false, notes: false })
+  const [clockNow, setClockNow] = useState(() => Date.now())
 
   async function load() {
     setLoading(true)
@@ -97,6 +98,38 @@ export default function Dashboard({ user, onNavigate, onQuickAdd, onOpenSecurity
     }))
   }, [transactions])
 
+  const nextReminder = useMemo(() => reminders[0] || null, [reminders])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const nextReminderMeta = useMemo(() => {
+    if (!nextReminder) return null
+    const due = new Date(nextReminder.due_at).getTime()
+    const diff = Math.max(0, due - clockNow)
+    const totalSeconds = Math.floor(diff / 1000)
+    const days = Math.floor(totalSeconds / 86400)
+    const hours = Math.floor((totalSeconds % 86400) / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
+
+    let countdown = ''
+    if (days > 0) countdown = `${days}d ${hours}h`
+    else if (hours > 0) countdown = `${hours}h ${minutes}m`
+    else if (minutes > 0) countdown = `${minutes}m ${seconds}s`
+    else countdown = `${seconds}s`
+
+    const dueDate = new Date(nextReminder.due_at)
+    return {
+      countdown,
+      timeLabel: dueDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+      dateLabel: dueDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }),
+      priority: nextReminder.priority || 'medium',
+    }
+  }, [nextReminder, clockNow])
+
   const budgetProgress = useMemo(() => {
     const rows = budgets.map(budget => {
       const spent = transactions
@@ -135,6 +168,31 @@ export default function Dashboard({ user, onNavigate, onQuickAdd, onOpenSecurity
         <button className="primary-btn" onClick={()=>onQuickAdd()}><Plus size={15}/> Quick add</button>
       </div>
     </div>
+
+    <section className="dashboard-focus-card">
+      <div className="dashboard-focus-icon"><Bell size={18}/></div>
+      <div className="dashboard-focus-main">
+        <div className="panel-kicker">NEXT UP</div>
+        {nextReminder && nextReminderMeta ? (
+          <>
+            <h3>{nextReminder.title}</h3>
+            <div className="dashboard-focus-meta">
+              <span className={`dashboard-focus-priority ${nextReminderMeta.priority}`}>{nextReminderMeta.priority} priority</span>
+              <span>{nextReminderMeta.dateLabel} · {nextReminderMeta.timeLabel}</span>
+            </div>
+          </>
+        ) : (
+          <>
+            <h3>Nothing waiting for you.</h3>
+            <div className="dashboard-focus-meta"><span>Your schedule is clear.</span></div>
+          </>
+        )}
+      </div>
+      <div className="dashboard-focus-countdown">
+        {nextReminderMeta ? <><strong>{nextReminderMeta.countdown}</strong><span>until next reminder</span></> : <><strong>—</strong><span>no upcoming reminder</span></>}
+      </div>
+      <button className="dashboard-focus-open" onClick={()=>onNavigate('reminders')}><ChevronRight size={17}/></button>
+    </section>
 
     <section className="dashboard-today">
       <div className="dashboard-today-main">
