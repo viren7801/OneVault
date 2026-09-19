@@ -63,7 +63,7 @@ jobs:
           test -n "${APKSIGNER}" && test -x "${APKSIGNER}"
           CERT_OUTPUT="$("${APKSIGNER}" verify --print-certs app/build/outputs/apk/debug/app-debug.apk 2>&1)"
           printf '%s\n' "${CERT_OUTPUT}"
-          SHA256="$(printf '%s\n' "${CERT_OUTPUT}" | awk -F': ' '/certificate SHA-256 digest:/ {print $2; exit}' | tr -d '\r')"
+          SHA256="$(printf '%s\n' "${CERT_OUTPUT}" | awk -F': ' '/certificate SHA-256 digest:/ {print $3; exit}' | tr -d '\r')"
           test -n "${SHA256}"
           echo "sha256=${SHA256}" >> "${GITHUB_OUTPUT}"
           APK_KEY_HASH="$(printf '%s' "${SHA256}" | tr -d ':' | xxd -r -p | base64 | tr '+/' '-_' | tr -d '=')"
