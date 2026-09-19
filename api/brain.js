@@ -164,7 +164,7 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: process.env.BRAIN_MODEL || 'claude-sonnet-5',
+        model: process.env.BRAIN_MODEL_DEEP || process.env.BRAIN_MODEL || 'claude-sonnet-5',
         max_tokens: 1800,
         system: SYSTEM_PROMPT,
         messages: [
