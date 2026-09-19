@@ -83,7 +83,7 @@ export async function persistNativeSession(session) {
     })
     return true
   } catch (nativeError) {
-    console.warn('[oneVault] native biometric session was not stored:', nativeError?.message || nativeError)
+    console.warn('[OneVault] native biometric session was not stored:', nativeError?.message || nativeError)
     return false
   }
 }
@@ -94,7 +94,7 @@ export async function clearNativeSession() {
   try {
     await SecureStorage.remove(STORAGE_KEY)
   } catch (nativeError) {
-    console.warn('[oneVault] native biometric session cleanup failed:', nativeError?.message || nativeError)
+    console.warn('[OneVault] native biometric session cleanup failed:', nativeError?.message || nativeError)
   }
 }
 
@@ -118,8 +118,8 @@ export async function registerNativeAwarePasskey() {
 
     await BiometricAuth.authenticate(
       authenticateOptions(
-        'Confirm you want to use this device to unlock oneVault.',
-        'Enable oneVault device unlock',
+        'Confirm you want to use this device to unlock OneVault.',
+        'Enable OneVault device unlock',
         'Use your fingerprint or strong device biometric. Your PIN remains available as fallback.',
       ),
     )
@@ -166,8 +166,8 @@ export async function signInWithNativeAwarePasskey() {
 
     await BiometricAuth.authenticate(
       authenticateOptions(
-        'Unlock your private oneVault workspace.',
-        'Unlock oneVault',
+        'Unlock your private OneVault workspace.',
+        'Unlock OneVault',
         'Use your fingerprint or strong device biometric. Your PIN remains available as fallback.',
       ),
     )
