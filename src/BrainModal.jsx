@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { ArrowUp, Search, Sparkles, X } from 'lucide-react'
+import { ArrowUp, Search, Sparkles, X, Zap } from 'lucide-react'
 import { askBrain, collectBrainContext } from './brain'
 
 const SUGGESTIONS = [
@@ -15,6 +15,7 @@ function formatAnswer(answer) {
 
 export default function BrainModal({ user, onClose }) {
   const [question, setQuestion] = useState('')
+  const [mode, setMode] = useState('quick')
   const [answer, setAnswer] = useState('')
   const [sources, setSources] = useState([])
   const [busy, setBusy] = useState(false)
@@ -36,12 +37,12 @@ export default function BrainModal({ user, onClose }) {
     setError('')
     setAnswer('')
     setSources([])
-    setStage('Reading your OneVault data…')
+    setStage(mode === 'quick' ? 'Reading your OneVault data…' : 'Reading your OneVault data…')
 
     try {
       const context = await collectBrainContext(user.id, value)
-      setStage('Thinking…')
-      const result = await askBrain(value, context)
+      setStage(mode === 'quick' ? 'Quick answer…' : 'Claude is reasoning…')
+      const result = await askBrain(value, context, { mode })
       setAnswer(formatAnswer(result.answer))
       setSources(result.sources || [])
       setStage('')
@@ -53,6 +54,8 @@ export default function BrainModal({ user, onClose }) {
         setError('OneVault Brain is not configured on the server yet.')
       } else if (code === 'CONTEXT_TOO_LARGE') {
         setError('There is too much workspace data for this question. Try making the question more specific.')
+      } else if (code === 'QUICK_UNSUPPORTED') {
+        setError('Quick mode does not support this question yet. Switch to Claude for deeper reasoning.')
       } else {
         setError('OneVault Brain could not answer right now. Please try again.')
       }
@@ -71,11 +74,44 @@ export default function BrainModal({ user, onClose }) {
             <div>
               <div className="panel-kicker">ONEVAULT BRAIN</div>
               <h3>Ask your workspace.</h3>
-              <p>Answers come from your OneVault data. Password contents are never sent to the AI.</p>
+              <p>
+            Quick mode answers supported questions locally. Claude mode sends only the selected workspace context for deeper reasoning.
+            Password contents are never sent.
+          </p>
             </div>
           </div>
           <button className="icon-btn" onClick={onClose} aria-label="Close"><X size={18}/></button>
         </header>
+
+        <div className="brain-mode-row">
+          <div className="brain-mode-toggle" role="tablist" aria-label="Answer mode">
+            <button
+              type="button"
+              className={mode === 'quick' ? 'active' : ''}
+              onClick={() => setMode('quick')}
+              role="tab"
+              aria-selected={mode === 'quick'}
+            >
+              <Zap size={13}/>
+              Quick
+            </button>
+            <button
+              type="button"
+              className={mode === 'claude' ? 'active' : ''}
+              onClick={() => setMode('claude')}
+              role="tab"
+              aria-selected={mode === 'claude'}
+            >
+              <Sparkles size={13}/>
+              Claude
+            </button>
+          </div>
+          <span className="brain-mode-hint">
+            {mode === 'quick'
+              ? 'Instant local answers · no AI usage'
+              : 'Deeper reasoning with Claude Sonnet 5'}
+          </span>
+        </div>
 
         <form className="brain-query" onSubmit={submit}>
           <Search size={17}/>
@@ -124,7 +160,11 @@ export default function BrainModal({ user, onClose }) {
             <div className="brain-answer-body">{answer}</div>
             <div className="brain-privacy-note">
               <Sparkles size={13}/>
-              <span>Passwords are excluded. Note content remains encrypted client-side and is not included yet.</span>
+              <span>
+                {mode === 'claude'
+                  ? 'Claude received only workspace context. Password contents are excluded, and note content remains encrypted client-side.'
+                  : 'No AI was used. The answer was calculated from your OneVault data locally.'}
+              </span>
             </div>
             {sources.length > 0 && (
               <div className="brain-sources">
@@ -138,7 +178,11 @@ export default function BrainModal({ user, onClose }) {
         )}
 
         <footer className="brain-footer">
-          <span>Private context · AI sees only the data needed for this question.</span>
+          <span>
+            {mode === 'quick'
+              ? 'Quick mode · local calculation · no Claude usage.'
+              : 'Claude mode · private context · only the relevant workspace data is sent.'}
+          </span>
           <button type="button" className="secondary-btn" onClick={onClose}>Close</button>
         </footer>
       </section>
