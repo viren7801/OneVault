@@ -1,6 +1,18 @@
 import { Capacitor } from '@capacitor/core'
 
+const MANIFEST_URL = '/live-updates/latest.json'
+
 let liveUpdatePromise
+let readyPromise
+
+async function getLiveUpdatePlugin() {
+  if (!Capacitor.isNativePlatform()) return null
+  if (!Capacitor.isPluginAvailable('LiveUpdate')) return null
+  if (!liveUpdatePromise) {
+    liveUpdatePromise = import('@capawesome/capacitor-live-update').then(module => module.LiveUpdate)
+  }
+  return liveUpdatePromise
+}
 
 function isValidManifest(value) {
   return Boolean(
@@ -14,60 +26,107 @@ function isValidManifest(value) {
   )
 }
 
-async function getLiveUpdatePlugin() {
-  if (!Capacitor.isNativePlatform()) return null
-  if (!Capacitor.isPluginAvailable('LiveUpdate')) return null
-  if (!liveUpdatePromise) {
-    liveUpdatePromise = import('@capawesome/capacitor-live-update').then(module => module.LiveUpdate)
+async function fetchManifest() {
+  const response = await fetch(MANIFEST_URL + '?t=' + Date.now(), {
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  })
+
+  if (!response.ok) {
+    throw new Error('Update server returned HTTP ' + response.status + '.')
   }
-  return liveUpdatePromise
+
+  const manifest = await response.json()
+  if (!isValidManifest(manifest)) {
+    throw new Error('The latest update manifest is invalid.')
+  }
+
+  return manifest
 }
 
 export async function initializeLiveUpdates() {
   const liveUpdate = await getLiveUpdatePlugin()
-  if (!liveUpdate) return
+  if (!liveUpdate) return null
 
-  try {
-    // Always acknowledge the current bundle before changing it.
-    await liveUpdate.ready()
-
-    const response = await fetch('/live-updates/latest.json?t=' + Date.now(), {
-      cache: 'no-store',
-      headers: { Accept: 'application/json' },
+  if (!readyPromise) {
+    readyPromise = liveUpdate.ready().catch(error => {
+      console.warn('[oneVault] live update ready check skipped:', error?.message || error)
+      return null
     })
-    if (!response.ok) return
+  }
 
-    const manifest = await response.json()
-    if (!isValidManifest(manifest)) return
+  return readyPromise
+}
 
-    const current = await liveUpdate.getCurrentBundle()
-    const next = await liveUpdate.getNextBundle()
+export async function getLiveUpdateStatus() {
+  const liveUpdate = await getLiveUpdatePlugin()
+  if (!liveUpdate) {
+    return { supported: false, available: false, currentBundleId: null, latestBundleId: null }
+  }
 
-    if (current.bundleId === manifest.bundleId || next.bundleId === manifest.bundleId) return
+  await initializeLiveUpdates()
 
-    const downloaded = await liveUpdate.getBundles()
-    if (!downloaded.bundleIds.includes(manifest.bundleId)) {
+  const [manifest, current, next] = await Promise.all([
+    fetchManifest(),
+    liveUpdate.getCurrentBundle(),
+    liveUpdate.getNextBundle(),
+  ])
+
+  const currentBundleId = current?.bundleId || null
+  const nextBundleId = next?.bundleId || null
+  const available = Boolean(
+    manifest.bundleId &&
+    manifest.bundleId !== currentBundleId &&
+    manifest.bundleId !== nextBundleId,
+  )
+
+  return {
+    supported: true,
+    available,
+    currentBundleId,
+    nextBundleId,
+    latestBundleId: manifest.bundleId,
+    latestUrl: manifest.url,
+    checksum: manifest.checksum,
+  }
+}
+
+export async function installLatestLiveUpdate(onProgress) {
+  const liveUpdate = await getLiveUpdatePlugin()
+  if (!liveUpdate) {
+    throw new Error('Live updates are only available in the native oneVault app.')
+  }
+
+  await initializeLiveUpdates()
+  const manifest = await fetchManifest()
+  const current = await liveUpdate.getCurrentBundle()
+  const next = await liveUpdate.getNextBundle()
+
+  if (manifest.bundleId === current?.bundleId) {
+    return { updated: false, bundleId: manifest.bundleId }
+  }
+
+  if (manifest.bundleId !== next?.bundleId) {
+    const listener = await liveUpdate.addListener('downloadBundleProgress', event => {
+      if (event?.bundleId !== manifest.bundleId) return
+      const progress = Math.max(0, Math.min(1, Number(event.progress) || 0))
+      onProgress?.(progress)
+    })
+
+    try {
       await liveUpdate.downloadBundle({
         url: manifest.url,
         bundleId: manifest.bundleId,
         artifactType: 'zip',
         checksum: manifest.checksum,
       })
+    } finally {
+      await listener.remove().catch(() => {})
     }
 
     await liveUpdate.setNextBundle({ bundleId: manifest.bundleId })
-
-    // Keep storage tidy without deleting the active or staged bundle.
-    const refreshed = await liveUpdate.getBundles()
-    const protectedIds = new Set(
-      [current.bundleId, manifest.bundleId].filter(Boolean),
-    )
-    for (const bundleId of refreshed.bundleIds) {
-      if (!protectedIds.has(bundleId)) {
-        await liveUpdate.deleteBundle({ bundleId }).catch(() => {})
-      }
-    }
-  } catch (error) {
-    console.warn('[oneVault] live update check skipped:', error?.message || error)
   }
+
+  onProgress?.(1)
+  return { updated: true, bundleId: manifest.bundleId, reload: () => liveUpdate.reload() }
 }
