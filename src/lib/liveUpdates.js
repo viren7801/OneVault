@@ -74,15 +74,13 @@ export async function getLiveUpdateStatus() {
 
   const currentBundleId = current?.bundleId || null
   const nextBundleId = next?.bundleId || null
-  const available = Boolean(
-    manifest.bundleId &&
-    manifest.bundleId !== currentBundleId &&
-    manifest.bundleId !== nextBundleId,
-  )
+  const available = Boolean(manifest.bundleId && manifest.bundleId !== currentBundleId)
+  const staged = Boolean(manifest.bundleId && manifest.bundleId === nextBundleId && manifest.bundleId !== currentBundleId)
 
   return {
     supported: true,
     available,
+    staged,
     currentBundleId,
     nextBundleId,
     latestBundleId: manifest.bundleId,
@@ -128,5 +126,10 @@ export async function installLatestLiveUpdate(onProgress) {
   }
 
   onProgress?.(1)
-  return { updated: true, bundleId: manifest.bundleId, reload: () => liveUpdate.reload() }
+  return {
+    updated: true,
+    staged: manifest.bundleId === next?.bundleId,
+    bundleId: manifest.bundleId,
+    reload: () => liveUpdate.reload(),
+  }
 }
