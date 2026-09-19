@@ -1522,8 +1522,15 @@ body{overscroll-behavior-x:none}
   }
 
   .main-area {
-    min-height: 100dvh;
+    min-height: 0 !important;
+    height: 100dvh !important;
+    max-height: 100dvh;
     flex: 1 1 auto;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
   }
 
   .content {
