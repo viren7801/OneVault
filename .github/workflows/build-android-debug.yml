@@ -59,7 +59,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          SHA256="$(apksigner verify --print-certs app/build/outputs/apk/debug/app-debug.apk | awk -F': ' '/Signer #1 certificate SHA-256 digest:/ {print $2}' | tr -d '\r')"
+          APKSIGNER="$(find "${ANDROID_HOME}/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "${APKSIGNER}" && test -x "${APKSIGNER}"
+          SHA256="$("${APKSIGNER}" verify --print-certs app/build/outputs/apk/debug/app-debug.apk | awk -F': ' '/Signer #1 certificate SHA-256 digest:/ {print $2}' | tr -d '\r')"
           echo "sha256=${SHA256}" >> "${GITHUB_OUTPUT}"
           APK_KEY_HASH="$(printf '%s' "${SHA256}" | tr -d ':' | xxd -r -p | base64 | tr '+/' '-_' | tr -d '=')"
           echo "apk_key_hash=android:apk-key-hash:${APK_KEY_HASH}" >> "${GITHUB_OUTPUT}"
