@@ -1310,3 +1310,176 @@ body{overscroll-behavior-x:none}
   .mobile-bottom-nav{left:5px;right:5px}
   .mobile-bottom-item{min-height:45px}
 }
+
+
+/* --- Reminders mobile refinement --- */
+.reminders-toolbar > div:first-child,
+.reminders-toolbar > div:first-child > * {
+  min-width: 0;
+}
+.reminders-toolbar h2 {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+.telegram-status-btn {
+  min-width: 0;
+  overflow: hidden;
+}
+.telegram-status-btn > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width:760px) {
+  /* The global workspace hero duplicates the Reminders header on phones. */
+  .content > .hero-row {
+    display: none;
+  }
+
+  .reminders-page {
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .reminders-toolbar {
+    width: 100%;
+    min-width: 0;
+    padding-top: 2px;
+  }
+
+  .reminders-toolbar > div:first-child {
+    width: 100%;
+  }
+
+  .reminders-toolbar h2 {
+    width: 100%;
+    max-width: 100%;
+    margin: 6px 0 7px;
+    font-size: clamp(24px, 7.1vw, 30px);
+    line-height: 1.08;
+    letter-spacing: -.045em;
+    overflow-wrap: anywhere;
+  }
+
+  .reminders-toolbar p {
+    width: 100%;
+    max-width: 100%;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  .reminders-actions {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .reminders-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .reminders-actions > * {
+    flex: 0 0 auto;
+  }
+
+  .telegram-status-btn {
+    max-width: min(100%, 300px);
+  }
+
+  .telegram-status-btn > span {
+    white-space: nowrap;
+  }
+
+  .reminder-kpis {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .reminder-stat {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .reminder-stat strong,
+  .reminder-stat span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .reminders-layout,
+  .calendar-panel,
+  .reminders-side,
+  .agenda-panel {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .calendar-panel {
+    overflow: hidden;
+  }
+
+  .calendar-grid {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .calendar-nav {
+    flex: 0 0 auto;
+  }
+
+  .calendar-nav .icon-btn {
+    flex: 0 0 auto;
+  }
+
+  .calendar-preview {
+    left: 10px;
+    right: 10px;
+    width: auto;
+    max-height: min(42dvh, 360px);
+    overflow: auto;
+  }
+}
+
+@media (max-width:430px) {
+  .reminders-toolbar h2 {
+    font-size: 25px;
+    line-height: 1.1;
+    max-width: 100%;
+  }
+
+  .reminders-toolbar p {
+    font-size: 10px;
+  }
+
+  .telegram-status-btn {
+    max-width: 100%;
+  }
+
+  .reminder-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reminder-stat {
+    padding: 11px 10px;
+  }
+
+  .reminder-stat strong {
+    font-size: 18px;
+  }
+
+  .reminder-stat span {
+    font-size: 8px;
+  }
+
+  .calendar-weekdays {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+}
