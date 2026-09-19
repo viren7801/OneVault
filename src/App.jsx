@@ -15,6 +15,7 @@ import Notes from './Notes'
 import PasskeyManager from './PasskeyManager'
 import Dashboard from './Dashboard'
 import BrainModal from './BrainModal'
+import NotificationsCenter from './NotificationsCenter'
 
 const modules = [
   { id: 'home', label: 'Home', icon: LayoutDashboard, description: 'Your private overview' },
@@ -1005,6 +1006,16 @@ function Reminders({ user }) {
     hoverVibrationRef.current = dateKey
     try { if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') navigator.vibrate(8) } catch {}
   }
+
+  function selectCalendarDate(day) {
+    const nextDate = startOfDay(day)
+    setSelectedDate(nextDate)
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        navigator.vibrate([10, 18, 14])
+      }
+    } catch {}
+  }
   function handleCalendarLeave() {
     hoverVibrationRef.current = null
     setHoveredDate(null)
@@ -1143,7 +1154,7 @@ function Reminders({ user }) {
             const dateKey = reminderDateKey(day)
             const previewItems = reminders.filter(r => sameCalendarDay(r.due_at, day)).sort((a,b)=>new Date(a.due_at)-new Date(b.due_at))
             const showPreview = hoveredDate === dateKey
-            return <div key={day.toISOString()} className={`calendar-day ${inMonth?'':'muted'} ${sameCalendarDay(day,today)?'today':''} ${selected?'selected':''} ${showPreview?'preview-open':''}`} onMouseEnter={()=>handleCalendarHover(dateKey)} onMouseLeave={handleCalendarLeave} onFocus={()=>handleCalendarHover(dateKey)} onBlur={handleCalendarLeave} onClick={()=>setSelectedDate(startOfDay(day))} role="button" tabIndex={0} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setSelectedDate(startOfDay(day))}}}>
+            return <div key={day.toISOString()} className={`calendar-day ${inMonth?'':'muted'} ${sameCalendarDay(day,today)?'today':''} ${selected?'selected':''} ${showPreview?'preview-open':''}`} onMouseEnter={()=>handleCalendarHover(dateKey)} onMouseLeave={handleCalendarLeave} onFocus={()=>handleCalendarHover(dateKey)} onBlur={handleCalendarLeave} onClick={()=>selectCalendarDate(day)} role="button" tabIndex={0} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectCalendarDate(day)}}}>
               <span className="calendar-number">{day.getDate()}</span>
               {dayItems.length>0&&<div className="calendar-dots">{dayItems.slice(0,3).map(item=><i key={item.id} className={`priority-dot ${item.priority||'medium'} ${item.completed?'done':''}`}/>)}{dayItems.length>3&&<b>+{dayItems.length-3}</b>}</div>}
               {showPreview&&<div className="calendar-preview" onClick={e=>e.stopPropagation()}>
@@ -1243,6 +1254,7 @@ function App() {
   const [commandOpen, setCommandOpen] = useState(false)
   const [commandQuery, setCommandQuery] = useState('')
   const [brainOpen, setBrainOpen] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [isOnline, setIsOnline] = useState(() => navigator.onLine)
   const [autoLockMinutes, setAutoLockMinutes] = useState(() => {
     const stored = Number(window.localStorage.getItem('onevault:autoLockMinutes'))
@@ -1361,6 +1373,14 @@ function App() {
       icon: Sparkles,
       keywords: 'ai brain ask question money spending expense reminders accounts budgets',
       run: () => { setCommandOpen(false); setCommandQuery(''); setBrainOpen(true) },
+    },
+    {
+      id: 'notifications',
+      label: 'Notifications',
+      description: 'Reminders, budgets, accounts and important workspace alerts',
+      icon: Bell,
+      keywords: 'notifications alerts reminders budget accounts telegram important',
+      run: () => { setCommandOpen(false); setCommandQuery(''); setNotificationsOpen(true) },
     },
     {
       id: 'quick-add',
@@ -1491,7 +1511,7 @@ function App() {
       <nav className="module-nav"><div className="nav-label">YOUR SPACE</div>{modules.map(m=>{const Icon=m.icon;return <button key={m.id} className={`module-btn ${active===m.id?'selected':''}`} onClick={()=>{setActive(m.id);setMobileOpen(false)}}><span className="module-icon"><Icon size={19}/></span><span className="module-copy"><strong>{m.label}</strong><small>{m.description}</small></span><ChevronRight size={15} className="module-arrow"/></button>})}</nav>
       <div className="sidebar-footer"><div className="privacy-card"><ShieldCheck size={18}/><div><strong>Private mode</strong><span>Owner-only database access.</span></div></div><button className="device-security-btn" onClick={()=>setShowPasskeyManager(true)}><Fingerprint size={15}/> Security</button><button className="logout-btn" onClick={signOut}><LogOut size={16}/> Sign out</button></div>
     </aside>
-    {mobileOpen&&<button className="backdrop" onClick={()=>setMobileOpen(false)}/>}<main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-btn mobile-menu" onClick={()=>setMobileOpen(true)}><Menu size={20}/></button><div><div className="eyebrow">PRIVATE DASHBOARD</div><h1>{activeModule.label}</h1></div></div><div className="topbar-actions"><span className={`network-status ${isOnline?'online':'offline'}`} title={isOnline?'Online':'Offline'}><span className="network-dot"/><span>{isOnline?'Online':'Offline'}</span></span><UpdateCenter/><button className="brain-topbar-btn" onClick={()=>setBrainOpen(true)} title="Ask OneVault"><Sparkles size={15}/><span>Ask</span></button><button className="command-trigger" onClick={()=>setCommandOpen(true)} title="Search and actions"><Search size={15}/><span>Search</span><kbd>⌘K</kbd></button><button className="primary-btn" onClick={()=>active==='pocket'?openTransaction('expense'):active==='reminders'?openReminder():active==='passwords'?openPassword():active==='notes'?openNote():setQuickAdd(true)}><Plus size={17}/> Quick add</button></div></header>
+    {mobileOpen&&<button className="backdrop" onClick={()=>setMobileOpen(false)}/>}<main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-btn mobile-menu" onClick={()=>setMobileOpen(true)}><Menu size={20}/></button><div><div className="eyebrow">PRIVATE DASHBOARD</div><h1>{activeModule.label}</h1></div></div><div className="topbar-actions"><span className={`network-status ${isOnline?'online':'offline'}`} title={isOnline?'Online':'Offline'}><span className="network-dot"/><span>{isOnline?'Online':'Offline'}</span></span><NotificationsCenter user={user} open={notificationsOpen} onOpen={()=>setNotificationsOpen(true)} onClose={()=>setNotificationsOpen(false)} onNavigate={module=>{setActive(module);setMobileOpen(false)}}/><UpdateCenter/><button className="brain-topbar-btn" onClick={()=>setBrainOpen(true)} title="Ask OneVault"><Sparkles size={15}/><span>Ask</span></button><button className="command-trigger" onClick={()=>setCommandOpen(true)} title="Search and actions"><Search size={15}/><span>Search</span><kbd>⌘K</kbd></button><button className="primary-btn" onClick={()=>active==='pocket'?openTransaction('expense'):active==='reminders'?openReminder():active==='passwords'?openPassword():active==='notes'?openNote():setQuickAdd(true)}><Plus size={17}/> Quick add</button></div></header>
        <section className="content">{(active==='pocket'||active==='reminders')&&<div className="hero-row"><div><span className="pill"><span className="status-dot"/> Private workspace</span><h2>Everything personal,<br/><span>in one place.</span></h2><p>Expenses, reminders, passwords and notes with one clean interface across your devices.</p></div><div className="date-card"><div className="date-label">TODAY</div><div className="date-value">{new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div><div className="date-helper">{user.email}</div></div></div>}
         {active==='home'?<Dashboard user={user} onNavigate={moduleId=>{setActive(moduleId);setMobileOpen(false)}} onQuickAdd={()=>setQuickAdd(true)} onOpenSecurity={()=>setShowPasskeyManager(true)} autoLockMinutes={autoLockMinutes}/>:active==='pocket'?<Pocket user={user} onQuickAdd={openTransaction}/>:active==='reminders'?<Reminders user={user}/>:active==='passwords'?<Passwords user={user}/>:active==='notes'?<Notes user={user}/>:<div className="workspace-grid"><section className="panel large-panel"><div className="panel-header"><div><div className="panel-kicker">MODULE</div><h3>{activeModule.label}</h3></div><button className="text-btn" onClick={()=>quickCreate(active)}>Add new <Plus size={15}/></button></div></section></div>}
       </section>
