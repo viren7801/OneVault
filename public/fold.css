@@ -1,0 +1,505 @@
+/* oneVault Fold / mobile adaptive shell */
+html {
+  min-height: 100%;
+  background: #0b0b0d;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100dvh;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+.app-shell {
+  min-height: 100dvh;
+}
+
+.topbar {
+  padding-top: env(safe-area-inset-top);
+  min-height: calc(82px + env(safe-area-inset-top));
+}
+
+.modal-layer {
+  padding-top: max(12px, env(safe-area-inset-top));
+  padding-right: max(12px, env(safe-area-inset-right));
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  padding-left: max(12px, env(safe-area-inset-left));
+}
+
+.mobile-bottom-nav {
+  padding-left: max(6px, env(safe-area-inset-left));
+  padding-right: max(6px, env(safe-area-inset-right));
+}
+
+/* Fold inner-screen landscape: turn the desktop sidebar into a compact icon rail. */
+@media (min-width: 761px) and (max-width: 980px) {
+  .sidebar {
+    width: 88px;
+    flex-basis: 88px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .sidebar .brand-row {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .sidebar .brand-row > :not(.brand-mark) {
+    display: none;
+  }
+
+  .nav-label,
+  .module-copy,
+  .module-arrow,
+  .privacy-card,
+  .device-security-btn,
+  .logout-btn {
+    display: none;
+  }
+
+  .module-nav {
+    gap: 8px;
+  }
+
+  .module-btn {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    padding: 7px 5px;
+  }
+
+  .module-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 13px;
+  }
+
+  .sidebar-footer {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .topbar {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .command-trigger span,
+  .command-trigger kbd {
+    display: none;
+  }
+
+  .command-trigger {
+    width: 38px;
+    justify-content: center;
+  }
+
+  .content {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}
+
+/* Fold unfolded portrait / roomy phone layout. */
+@media (min-width: 520px) and (max-width: 760px) {
+  .topbar {
+    min-height: calc(70px + env(safe-area-inset-top));
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .content {
+    padding: 24px 22px calc(108px + env(safe-area-inset-bottom));
+  }
+
+  .dashboard-heading h2 {
+    font-size: 34px;
+  }
+
+  .dashboard-today {
+    grid-template-columns: minmax(0, 1.25fr) minmax(250px, .85fr);
+  }
+
+  .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-wide-card,
+  .dashboard-activity-card {
+    grid-column: span 2;
+  }
+
+  .dashboard-card {
+    min-height: 178px;
+  }
+
+  .dashboard-footer-row {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .mobile-bottom-nav {
+    left: 14px;
+    right: 14px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+  }
+
+  .mobile-bottom-item {
+    min-height: 52px;
+    font-size: 7.5px;
+  }
+}
+
+/* Cover screen / compact phone mode. */
+@media (max-width: 519px) {
+  .topbar {
+    min-height: calc(62px + env(safe-area-inset-top));
+    padding-left: 10px;
+    padding-right: 10px;
+    gap: 8px;
+  }
+
+  .topbar-left {
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .mobile-menu {
+    width: 42px;
+    height: 42px;
+  }
+
+  .topbar-left > div {
+    min-width: 0;
+  }
+
+  .topbar .eyebrow {
+    display: none;
+  }
+
+  .topbar h1 {
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 15px;
+  }
+
+  .topbar-actions {
+    margin-left: auto;
+    gap: 5px;
+  }
+
+  .topbar-actions .primary-btn {
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    min-height: 42px;
+    padding: 0;
+    font-size: 0;
+    border-radius: 12px;
+  }
+
+  .topbar-actions .primary-btn svg {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+  }
+
+  .topbar-actions .command-trigger {
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    min-height: 42px;
+    padding: 0;
+  }
+
+  .network-status {
+    min-height: 28px;
+    padding: 0 7px;
+  }
+
+  .network-status span:last-child {
+    display: none;
+  }
+
+  .content {
+    padding: 18px 11px calc(112px + env(safe-area-inset-bottom));
+  }
+
+  .hero-row {
+    gap: 14px;
+  }
+
+  .hero-row h2 {
+    font-size: clamp(31px, 9vw, 38px);
+    line-height: 1.01;
+  }
+
+  .hero-row p {
+    max-width: 100%;
+    font-size: 12px;
+  }
+
+  .date-card {
+    padding: 13px;
+  }
+
+  .dashboard-page {
+    gap: 10px;
+  }
+
+  .dashboard-heading {
+    gap: 10px;
+  }
+
+  .dashboard-heading h2 {
+    font-size: 25px;
+    line-height: 1.06;
+  }
+
+  .dashboard-heading p {
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  .dashboard-heading-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .dashboard-heading-actions > * {
+    min-width: 0;
+  }
+
+  .dashboard-focus-card {
+    gap: 9px;
+    padding: 12px;
+  }
+
+  .dashboard-focus-main h3 {
+    font-size: 14px;
+  }
+
+  .dashboard-focus-meta {
+    gap: 6px;
+  }
+
+  .dashboard-focus-countdown strong {
+    font-size: 16px;
+  }
+
+  .dashboard-today-main,
+  .dashboard-today-side {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .dashboard-section-head h3 {
+    font-size: 15px;
+  }
+
+  .dashboard-today-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dashboard-quick-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .dashboard-card,
+  .dashboard-wide-card,
+  .dashboard-security-card,
+  .dashboard-activity-card {
+    min-height: 145px;
+    padding: 12px;
+    border-radius: 15px;
+  }
+
+  .dashboard-wide-card,
+  .dashboard-activity-card {
+    grid-column: auto;
+  }
+
+  .dashboard-money-main {
+    font-size: 23px;
+  }
+
+  .dashboard-stat-number {
+    font-size: 28px;
+  }
+
+  .dashboard-private-row {
+    margin-top: 18px;
+  }
+
+  .dashboard-footer-row {
+    gap: 8px;
+  }
+
+  .dashboard-account-strip {
+    max-width: 100%;
+  }
+
+  .dashboard-footer-row .text-btn {
+    align-self: flex-start;
+  }
+
+  .mobile-bottom-nav {
+    left: 7px;
+    right: 7px;
+    bottom: max(7px, env(safe-area-inset-bottom));
+    padding: 5px;
+    border-radius: 16px;
+  }
+
+  .mobile-bottom-item {
+    min-height: 47px;
+    border-radius: 11px;
+    font-size: 6.5px;
+  }
+
+  .mobile-bottom-item svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .icon-btn {
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+  }
+
+  .panel-header {
+    padding: 12px;
+  }
+
+  .panel h3 {
+    font-size: 15px;
+  }
+
+  .pocket-toolbar h2,
+  .reminders-toolbar h2,
+  .module-toolbar h2 {
+    font-size: 24px;
+  }
+
+  .pocket-actions,
+  .reminders-actions,
+  .module-toolbar-actions {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .pocket-actions::-webkit-scrollbar,
+  .reminders-actions::-webkit-scrollbar,
+  .module-toolbar-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pocket-actions > *,
+  .reminders-actions > *,
+  .module-toolbar-actions > * {
+    flex: 0 0 auto;
+    min-height: 42px;
+  }
+
+  .pocket-kpis,
+  .reminder-kpis {
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+  }
+
+  .money-card,
+  .reminder-stat {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .money-card strong {
+    font-size: 18px;
+  }
+
+  .reminder-stat strong {
+    font-size: 20px;
+  }
+
+  .calendar-day {
+    min-height: 48px;
+    padding: 6px 4px;
+  }
+
+  .calendar-number {
+    width: 22px;
+    height: 22px;
+  }
+
+  .transaction-filters {
+    gap: 6px;
+  }
+
+  .modal-layer {
+    align-items: end;
+    padding: 8px;
+  }
+
+  .modal {
+    max-height: calc(100dvh - 16px);
+    padding: 15px;
+    border-radius: 19px;
+  }
+
+  .modal-actions {
+    position: sticky;
+    bottom: 0;
+    padding-top: 8px;
+    padding-bottom: max(2px, env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, rgba(18,18,22,.78), #121216 35%);
+  }
+
+  .auth-page {
+    min-height: 100dvh;
+    padding: 16px 11px calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .auth-card {
+    padding: 21px;
+    border-radius: 21px;
+  }
+}
+
+/* Installed PWA / standalone polish. */
+@media (display-mode: standalone) {
+  body {
+    background: #0b0b0d;
+  }
+
+  .topbar {
+    padding-top: max(env(safe-area-inset-top), 2px);
+  }
+}
+
+@media (display-mode: fullscreen) {
+  .topbar {
+    padding-top: env(safe-area-inset-top);
+  }
+}
