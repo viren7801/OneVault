@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
 import {
   Bell, Check, ChevronRight, CircleDollarSign, CreditCard, Edit3, Filter, Fingerprint, LayoutDashboard, MessageCircle,
   LockKeyhole, LogOut, Menu, NotebookPen, Plus, Search, ShieldCheck,
@@ -866,9 +867,43 @@ function App() {
 
   useEffect(() => {
     let mounted = true
-    supabase.auth.getSession().then(({ data }) => { if (mounted) { void persistNativeSession(data.session); setUser(data.session?.user || null); setAuthLoading(false) } })
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => { if (session) void persistNativeSession(session); setUser(session?.user || null); setAuthLoading(false) })
-    return () => { mounted = false; sub.subscription.unsubscribe() }
+
+    async function bootstrapAuth() {
+      const { data } = await supabase.auth.getSession()
+      if (!mounted) return
+
+      if (Capacitor.isNativePlatform()) {
+        // Keep the protected native session in secure storage, but always open
+        // the Android/iOS app behind the device authentication screen.
+        if (data.session) {
+          await persistNativeSession(data.session)
+          await supabase.auth.signOut({ scope: 'local' })
+        }
+        setUser(null)
+      } else {
+        setUser(data.session?.user || null)
+      }
+
+      setAuthLoading(false)
+    }
+
+    void bootstrapAuth()
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (Capacitor.isNativePlatform() && !session) {
+        setUser(null)
+        setAuthLoading(false)
+        return
+      }
+      if (session) void persistNativeSession(session)
+      setUser(session?.user || null)
+      setAuthLoading(false)
+    })
+
+    return () => {
+      mounted = false
+      sub.subscription.unsubscribe()
+    }
   }, [])
 
   useEffect(() => {
