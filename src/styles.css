@@ -1055,6 +1055,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 }
 @media (max-width:430px){
   .dashboard-grid{grid-template-columns:1fr}
-  .dashboard-wide-card{grid-column:auto}
-  .dashboard-card,.dashboard-wide-card,.dashboard-security-card{min-height:150px}
+  .dashboard-wide-card,.dashboard-activity-card{grid-column:auto}
+  .dashboard-card,.dashboard-wide-card,.dashboard-security-card,.dashboard-activity-card{min-height:150px}
 }
