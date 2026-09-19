@@ -142,10 +142,12 @@ jobs:
         id: upload
         env:
           GH_TOKEN: ${{ github.token }}
-          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ARTIFACT_ID: ""
           RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
+          ARTIFACT_ID="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts" --paginate --jq '.artifacts[] | select(.name == "onevault-android-debug") | .id' | tail -n 1)"
+          test -n "${ARTIFACT_ID}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
