@@ -14,6 +14,8 @@ on:
       - src/lib/liveUpdates.js
       - src/UpdateCenter.jsx
       - src/updateCenter.css
+      - src/styles.css
+      - public/fold.css
       - .github/workflows/build-android-debug.yml
   workflow_dispatch:
 
