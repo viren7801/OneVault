@@ -1485,6 +1485,99 @@ body{overscroll-behavior-x:none}
 }
 
 
+/* --- Reliable phone / fold scrolling + Apple-inspired motion --- */
+@media (max-width:980px) {
+  html,
+  body,
+  #root {
+    width: 100%;
+    min-width: 0;
+    min-height: 100%;
+    height: auto !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body {
+    overscroll-behavior-y: auto !important;
+    touch-action: pan-y;
+  }
+
+  .app-shell,
+  .main-area,
+  .content,
+  .pocket-page,
+  .reminders-page,
+  .passwords-page,
+  .notes-page {
+    height: auto !important;
+    min-height: 0;
+    overflow: visible !important;
+  }
+
+  .app-shell {
+    min-height: 100dvh;
+    display: flex;
+  }
+
+  .main-area {
+    min-height: 100dvh;
+    flex: 1 1 auto;
+  }
+
+  .content {
+    padding-bottom: calc(118px + env(safe-area-inset-bottom));
+  }
+
+  /* The phone/fold should use one document scroll instead of nested panes. */
+  .pocket-page .transactions-panel,
+  .pocket-page .transaction-table,
+  .pocket-page .pocket-side,
+  .pocket-page .account-list,
+  .pocket-page .budget-list,
+  .reminders-page .reminders-layout,
+  .reminders-page .calendar-panel,
+  .reminders-page .reminders-side,
+  .reminders-page .reminder-list,
+  .passwords-page .passwords-layout,
+  .passwords-page .password-list-panel,
+  .passwords-page .password-detail-panel,
+  .passwords-page .password-list,
+  .passwords-page .password-detail,
+  .notes-page .notes-layout,
+  .notes-page .notes-list-panel,
+  .notes-page .note-editor-panel,
+  .notes-page .note-list,
+  .notes-page .note-detail {
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .passwords-page .password-detail,
+  .notes-page .note-detail {
+    min-height: 0 !important;
+  }
+
+  .passwords-page .password-list,
+  .notes-page .note-list,
+  .reminders-page .reminder-list {
+    display: grid;
+    gap: 6px;
+  }
+
+  /* Keep only deliberately bounded UI surfaces scrollable. */
+  .calendar-preview,
+  .command-list,
+  .history-list,
+  .modal {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+}
+
 /* --- Mobile scrolling + Apple-inspired motion --- */
 @keyframes oneVaultSpringIn {
   from {
