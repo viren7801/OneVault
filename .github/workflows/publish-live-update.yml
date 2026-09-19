@@ -58,7 +58,7 @@ jobs:
           cat > public/live-updates/latest.json <<EOF
           {
             "bundleId": "${GITHUB_SHA}",
-            "url": "https://onevault.patelviren.com/live-updates/latest.zip",
+            "url": "https://raw.githubusercontent.com/viren7801/OneVault/main/public/live-updates/latest.zip",
             "checksum": "${CHECKSUM}"
           }
           EOF
