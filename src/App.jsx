@@ -3,9 +3,10 @@ import { Capacitor } from '@capacitor/core'
 import {
   Bell, Check, ChevronRight, CircleDollarSign, CreditCard, Edit3, Filter, Fingerprint, LayoutDashboard, MessageCircle,
   LockKeyhole, LogOut, Menu, NotebookPen, Plus, Search, ShieldCheck,
-  Trash2, WalletCards, X, TrendingDown, TrendingUp, PiggyBank, RefreshCw,
+  Trash2, WalletCards, X, TrendingDown, TrendingUp, PiggyBank, RefreshCw, ScanLine, ImagePlus, Loader2,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
+import { scanReceipt } from './receiptScan'
 import { clearNativeSession, getNativeDeviceStatus, persistNativeSession, signInWithNativeAwarePasskey } from './lib/nativePasskeys'
 import UpdateCenter from './UpdateCenter'
 import Passwords from './Passwords'
@@ -123,6 +124,150 @@ function TransactionModal({ user, accounts, initial, onClose, onSaved }) {
   </div></div>
 }
 
+function ScanReceiptModal({ onClose, onExtracted }) {
+  const [file, setFile] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const cameraInputRef = useRef(null)
+  const galleryInputRef = useRef(null)
+
+  function chooseFile(nextFile) {
+    if (!nextFile) return
+    if (!nextFile.type?.startsWith('image/')) {
+      setError('Please choose an image of the receipt.')
+      return
+    }
+
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    setFile(nextFile)
+    setPreviewUrl(URL.createObjectURL(nextFile))
+    setError('')
+  }
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+    }
+  }, [previewUrl])
+
+  async function extract() {
+    if (!file) return
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const result = await scanReceipt(file)
+      onExtracted(result)
+    } catch (scanError) {
+      const code = scanError?.message || ''
+
+      if (code === 'AUTH_REQUIRED') {
+        setError('Your OneVault session expired. Sign in again and retry.')
+      } else if (code === 'SERVER_NOT_CONFIGURED') {
+        setError('Claude receipt scanning is not configured on the OneVault server yet.')
+      } else if (code === 'NO_AMOUNT_FOUND') {
+        setError('I could not find a clear final total. Try a sharper photo showing the bottom of the receipt.')
+      } else if (code === 'IMAGE_TOO_LARGE') {
+        setError('That image is too large. Choose another photo.')
+      } else if (code === 'UNSUPPORTED_IMAGE') {
+        setError('This image format could not be processed. JPG or PNG works best.')
+      } else {
+        setError('Something went wrong while reading the receipt. Please try again.')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return <div className="modal-layer">
+    <div className="modal receipt-scan-modal">
+      <div className="modal-header">
+        <div>
+          <div className="panel-kicker">AI RECEIPT SCANNER</div>
+          <h3>Turn a receipt into a Pocket entry.</h3>
+        </div>
+        <button className="icon-btn" onClick={onClose} disabled={loading}><X size={18}/></button>
+      </div>
+
+      {!file ? (
+        <>
+          <div className="receipt-scan-hero">
+            <div className="receipt-scan-icon"><ScanLine size={23}/></div>
+            <div>
+              <strong>Scan with Claude</strong>
+              <span>Reads the merchant, final total, date and category, then prepares the transaction for confirmation.</span>
+            </div>
+          </div>
+
+          <div className="receipt-scan-source-grid">
+            <button type="button" className="receipt-scan-option" onClick={()=>cameraInputRef.current?.click()}>
+              <span className="receipt-scan-option-icon"><ScanLine size={18}/></span>
+              <span><strong>Take photo</strong><small>Use your camera</small></span>
+            </button>
+            <button type="button" className="receipt-scan-option" onClick={()=>galleryInputRef.current?.click()}>
+              <span className="receipt-scan-option-icon"><ImagePlus size={18}/></span>
+              <span><strong>Choose from gallery</strong><small>Select an existing receipt</small></span>
+            </button>
+          </div>
+
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            onChange={event=>chooseFile(event.target.files?.[0])}
+          />
+          <input
+            ref={galleryInputRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={event=>chooseFile(event.target.files?.[0])}
+          />
+
+          <div className="receipt-scan-hint">
+            Your image is resized in the app before upload. The Claude API key stays on the OneVault server.
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="receipt-scan-preview-wrap">
+            <img src={previewUrl} alt="Receipt preview" className="receipt-scan-preview"/>
+          </div>
+
+          <div className="receipt-scan-file-row">
+            <div>
+              <strong>{file.name || 'Receipt image'}</strong>
+              <span>{Math.max(1, Math.round(file.size / 1024))} KB · ready to analyze</span>
+            </div>
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={()=>chooseFile(null)}
+              disabled={loading}
+            >
+              Change
+            </button>
+          </div>
+
+          <div className="receipt-scan-actions">
+            <button type="button" className="secondary-btn" onClick={onClose} disabled={loading}>Cancel</button>
+            <button type="button" className="primary-btn" onClick={()=>void extract()} disabled={loading}>
+              {loading ? <Loader2 size={15} className="update-spin"/> : <ScanLine size={15}/>}
+              {loading ? 'Reading receipt…' : 'Extract expense'}
+            </button>
+          </div>
+        </>
+      )}
+
+      {error && <div className="form-error receipt-scan-error">{error}</div>}
+    </div>
+  </div>
+}
+
 function AccountModal({ user, initial, onClose, onSaved }) {
   const [name, setName] = useState(initial?.name || '')
   const [type, setType] = useState(initial?.type ? initial.type.replace(/(^|\s)\S/g, s=>s.toUpperCase()) : 'Bank')
@@ -183,6 +328,7 @@ function Pocket({ user, onQuickAdd }) {
   const [budgetModal, setBudgetModal] = useState(null)
   const [editing, setEditing] = useState(null)
   const [transactionModal, setTransactionModal] = useState(null)
+  const [scanReceiptOpen, setScanReceiptOpen] = useState(false)
 
   async function load() {
     setLoading(true); setError('')
@@ -260,10 +406,27 @@ function Pocket({ user, onQuickAdd }) {
     if (error) setError(error.message); else setBudgets(items=>items.filter(x=>x.id!==id))
   }
 
+  function openScannedTransaction(result) {
+    const category = categories.includes(result.category) ? result.category : 'Other'
+    const localDate = result.date
+      ? `${result.date}T12:00`
+      : new Date().toISOString().slice(0, 16)
+
+    setScanReceiptOpen(false)
+    setTransactionModal({
+      type: 'expense',
+      amount: result.amount,
+      category,
+      description: result.merchant || result.note || 'Receipt purchase',
+      account_id: '',
+      spent_at: localDate,
+    })
+  }
+
   if (loading) return <div className="loading-state pocket-loading">Loading Pocket…</div>
 
   return <div className="pocket-page">
-    <div className="pocket-toolbar"><div><div className="panel-kicker">POCKET</div><h2>Money, without the mess.</h2><p>Track cash flow, accounts and monthly limits in one view.</p></div><div className="pocket-actions"><button className="secondary-btn" onClick={load}><RefreshCw size={15}/> Refresh</button><button className="secondary-btn" onClick={()=>setAccountModal({})}><CreditCard size={15}/> Account</button><button className="secondary-btn" onClick={()=>setBudgetModal({})}><PiggyBank size={15}/> Budget</button><button className="primary-btn" onClick={()=>onQuickAdd('expense')}><Plus size={16}/> Transaction</button></div></div>
+    <div className="pocket-toolbar"><div><div className="panel-kicker">POCKET</div><h2>Money, without the mess.</h2><p>Track cash flow, accounts and monthly limits in one view.</p></div><div className="pocket-actions"><button className="secondary-btn" onClick={load}><RefreshCw size={15}/> Refresh</button><button className="secondary-btn" onClick={()=>setScanReceiptOpen(true)}><ScanLine size={15}/> Scan receipt</button><button className="secondary-btn" onClick={()=>setAccountModal({})}><CreditCard size={15}/> Account</button><button className="secondary-btn" onClick={()=>setBudgetModal({})}><PiggyBank size={15}/> Budget</button><button className="primary-btn" onClick={()=>onQuickAdd('expense')}><Plus size={16}/> Transaction</button></div></div>
 
     {error&&<div className="form-error pocket-error">{error}</div>}
 
@@ -279,6 +442,7 @@ function Pocket({ user, onQuickAdd }) {
     <aside className="pocket-side"><section className="panel accounts-panel"><div className="panel-header"><div><div className="panel-kicker">ACCOUNTS</div><h3>Your money</h3></div><button className="icon-btn" onClick={()=>setAccountModal({})}><Plus size={16}/></button></div>{accounts.length===0?<div className="side-empty">Add a bank, cash wallet or card.</div>:<div className="account-list">{accounts.map(account=><div className="account-row" key={account.id}><div className="module-icon"><CreditCard size={16}/></div><div><strong>{account.name}</strong><small>{account.type}</small></div><div className="account-right"><strong>{money(account.balance)}</strong><div><button onClick={()=>setAccountModal(account)} className="mini-btn"><Edit3 size={12}/></button><button onClick={()=>deleteAccount(account)} className="mini-btn danger"><Trash2 size={12}/></button></div></div></div>)}</div>}</section>
       <section className="panel budgets-panel"><div className="panel-header"><div><div className="panel-kicker">BUDGETS</div><h3>This month</h3></div><button className="icon-btn" onClick={()=>setBudgetModal({})}><Plus size={16}/></button></div>{budgets.length===0?<div className="side-empty">Set category limits to keep spending on track.</div>:<div className="budget-list">{budgets.map(b=>{const spent=current.filter(x=>x.type==='expense'&&x.category===b.category).reduce((s,x)=>s+Number(x.amount),0);const pct=Math.min(100,(spent/Number(b.amount))*100);return <div className="budget-row" key={b.id}><div><strong>{b.category}</strong><span>{money(spent)} of {money(b.amount)}</span></div><div className="budget-track"><div className={`budget-fill ${pct>=100?'over':''}`} style={{width:`${pct}%`}}/></div><div className="budget-foot"><small>{Math.round(pct)}% used</small><button className="mini-btn danger" onClick={()=>deleteBudget(b.id)}><Trash2 size={12}/></button></div></div>})}</div>}</section></aside></div>
 
+    {scanReceiptOpen&&<ScanReceiptModal onClose={()=>setScanReceiptOpen(false)} onExtracted={openScannedTransaction}/>}
     {transactionModal&&<TransactionModal user={user} accounts={accounts} initial={transactionModal} onClose={()=>setTransactionModal(null)} onSaved={saveTransaction}/>} {editing&&<TransactionModal user={user} accounts={accounts} initial={editing} onClose={()=>setEditing(null)} onSaved={saveTransaction}/>} {accountModal!==null&&<AccountModal user={user} initial={accountModal?.id?accountModal:null} onClose={()=>setAccountModal(null)} onSaved={data=>setAccounts(items=>accountModal?.id?items.map(a=>a.id===data.id?data:a):[...items,data])}/>} {budgetModal!==null&&<BudgetModal user={user} initial={budgetModal?.id?budgetModal:null} onClose={()=>setBudgetModal(null)} onSaved={data=>setBudgets(items=>{const i=items.findIndex(b=>b.id===data.id);return i>=0?items.map(b=>b.id===data.id?data:b):[...items,data]})}/>} 
   </div>
 }
