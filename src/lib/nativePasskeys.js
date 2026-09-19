@@ -1,28 +1,12 @@
 import { Capacitor } from '@capacitor/core'
+import { BiometricAuth } from '@aparajita/capacitor-biometric-auth'
+import { SecureStorage } from '@aparajita/capacitor-secure-storage'
 import { supabase } from './supabase'
 
 const STORAGE_KEY = 'supabase_session'
-let biometricPromise
-let secureStoragePromise
 
 function isAndroid() {
   return Capacitor.getPlatform() === 'android'
-}
-
-async function getBiometricAuth() {
-  if (!Capacitor.isNativePlatform()) return null
-  if (!biometricPromise) {
-    biometricPromise = import('@aparajita/capacitor-biometric-auth').then(module => module.BiometricAuth)
-  }
-  return biometricPromise
-}
-
-async function getSecureStorage() {
-  if (!Capacitor.isNativePlatform()) return null
-  if (!secureStoragePromise) {
-    secureStoragePromise = import('@aparajita/capacitor-secure-storage').then(module => module.SecureStorage)
-  }
-  return secureStoragePromise
 }
 
 function error(message, code) {
@@ -32,9 +16,11 @@ function error(message, code) {
 }
 
 async function checkBiometricAvailability() {
-  const biometricAuth = await getBiometricAuth()
-  if (!biometricAuth) return { isAvailable: false, strongBiometryIsAvailable: false, biometryType: 'web' }
-  return biometricAuth.checkBiometry()
+  if (!Capacitor.isNativePlatform()) {
+    return { isAvailable: false, strongBiometryIsAvailable: false, biometryType: 'web' }
+  }
+
+  return BiometricAuth.checkBiometry()
 }
 
 async function requireBiometricAvailability() {
@@ -91,8 +77,7 @@ export async function persistNativeSession(session) {
     const availability = await requireBiometricAvailability()
     if (!availability.ok) return false
 
-    const secureStorage = await getSecureStorage()
-    await secureStorage.set(STORAGE_KEY, {
+    await SecureStorage.set(STORAGE_KEY, {
       access_token: session.access_token,
       refresh_token: session.refresh_token,
     })
@@ -105,9 +90,9 @@ export async function persistNativeSession(session) {
 
 export async function clearNativeSession() {
   if (!Capacitor.isNativePlatform()) return
+
   try {
-    const secureStorage = await getSecureStorage()
-    await secureStorage.remove(STORAGE_KEY)
+    await SecureStorage.remove(STORAGE_KEY)
   } catch (nativeError) {
     console.warn('[oneVault] native biometric session cleanup failed:', nativeError?.message || nativeError)
   }
@@ -121,17 +106,17 @@ export async function registerNativeAwarePasskey() {
   try {
     const { data, error: sessionError } = await supabase.auth.getSession()
     if (sessionError) return { data: null, error: sessionError }
+
     if (!data.session) {
       return { data: null, error: error('Sign in with your password first, then enable device unlock.') }
     }
 
-    const biometricAuth = await getBiometricAuth()
     const availability = await requireBiometricAvailability()
     if (!availability.ok) {
       return { data: null, error: availability.error }
     }
 
-    await biometricAuth.authenticate(
+    await BiometricAuth.authenticate(
       authenticateOptions(
         'Confirm you want to use this device to unlock oneVault.',
         'Enable oneVault device unlock',
@@ -165,8 +150,7 @@ export async function signInWithNativeAwarePasskey() {
   }
 
   try {
-    const secureStorage = await getSecureStorage()
-    const savedSession = await secureStorage.get(STORAGE_KEY)
+    const savedSession = await SecureStorage.get(STORAGE_KEY)
 
     if (!savedSession?.access_token || !savedSession?.refresh_token) {
       return {
@@ -180,9 +164,7 @@ export async function signInWithNativeAwarePasskey() {
       return { data: null, error: availability.error }
     }
 
-    const biometricAuth = await getBiometricAuth()
-
-    await biometricAuth.authenticate(
+    await BiometricAuth.authenticate(
       authenticateOptions(
         'Unlock your private oneVault workspace.',
         'Unlock oneVault',
