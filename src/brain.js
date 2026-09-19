@@ -236,7 +236,13 @@ function localBrainFallback(question, context) {
   return null
 }
 
-export async function askBrain(question, context) {
+export async function askBrain(question, context, { mode = 'quick' } = {}) {
+  if (mode === 'quick') {
+    const quickAnswer = localBrainFallback(question, context)
+    if (quickAnswer) return quickAnswer
+    throw new Error('QUICK_UNSUPPORTED')
+  }
+
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
   if (sessionError || !sessionData.session?.access_token) {
     throw new Error('AUTH_REQUIRED')
@@ -245,6 +251,7 @@ export async function askBrain(question, context) {
   const payload = {
     question: String(question || '').trim(),
     context,
+    mode: 'claude',
   }
 
   try {
@@ -260,9 +267,6 @@ export async function askBrain(question, context) {
     const body = await response.json().catch(() => ({}))
 
     if (!response.ok) {
-      const fallback = localBrainFallback(question, context)
-      if (fallback) return fallback
-
       if (response.status === 401 || body?.code === 'AUTH_REQUIRED') {
         throw new Error('AUTH_REQUIRED')
       }
@@ -278,14 +282,6 @@ export async function askBrain(question, context) {
       sources: Array.isArray(body?.sources) ? body.sources : [],
     }
   } catch (error) {
-    if (
-      error?.message !== 'AUTH_REQUIRED' &&
-      error?.message !== 'CONTEXT_TOO_LARGE' &&
-      error?.message !== 'BRAIN_NOT_CONFIGURED'
-    ) {
-      const fallback = localBrainFallback(question, context)
-      if (fallback) return fallback
-    }
     throw error
   }
 }
