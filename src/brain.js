@@ -130,39 +130,162 @@ export async function collectBrainContext(userId, query = '') {
   }
 }
 
+
+function formatInr(value) {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 2,
+  }).format(Number(value) || 0)
+}
+
+function formatDate(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(date)
+}
+
+function localBrainFallback(question, context) {
+  const q = normalizeText(question)
+  const summaries = context?.summaries || {}
+  const month = summaries.currentMonth || { income: 0, expenses: 0, transactions: 0 }
+  const year = summaries.currentYear || { income: 0, expenses: 0, transactions: 0 }
+
+  if ((q.includes('spent') || q.includes('spend')) && q.includes('this month')) {
+    return {
+      answer: `You have spent ${formatInr(month.expenses)} this month across ${month.transactions} transactions.`,
+      sources: ['summary:currentMonth'],
+    }
+  }
+
+  if ((q.includes('spent') || q.includes('spend')) && q.includes('this year')) {
+    return {
+      answer: `You have spent ${formatInr(year.expenses)} this year across ${year.transactions} transactions.`,
+      sources: ['summary:currentYear'],
+    }
+  }
+
+  if ((q.includes('income') || q.includes('earned')) && q.includes('this month')) {
+    return {
+      answer: `Your income this month is ${formatInr(month.income)}.`,
+      sources: ['summary:currentMonth'],
+    }
+  }
+
+  if ((q.includes('income') || q.includes('earned')) && q.includes('this year')) {
+    return {
+      answer: `Your income this year is ${formatInr(year.income)}.`,
+      sources: ['summary:currentYear'],
+    }
+  }
+
+  if (q.includes('category') && (q.includes('most') || q.includes('highest') || q.includes('maximum') || q.includes('spend'))) {
+    const entries = Object.entries(summaries.currentMonthByCategory || {})
+      .sort((a, b) => b[1] - a[1])
+    if (entries.length) {
+      const [category, amount] = entries[0]
+      return {
+        answer: `${category} is your highest-spending category this month at ${formatInr(amount)}.`,
+        sources: ['summary:currentMonthByCategory'],
+      }
+    }
+    return { answer: 'There is no expense data for this month yet.', sources: [] }
+  }
+
+  if (q.includes('overdue') && q.includes('reminder')) {
+    const rows = context?.overdueReminders || []
+    if (!rows.length) return { answer: 'You have no overdue reminders.', sources: [] }
+    const lines = rows.slice(0, 5).map(row => {
+      const when = formatDate(row.due_at)
+      return when ? `• ${row.title} — ${when}` : `• ${row.title}`
+    })
+    const more = rows.length > 5 ? ` and ${rows.length - 5} more` : ''
+    return {
+      answer: `You have ${rows.length} overdue reminder${rows.length === 1 ? '' : 's'}:\n${lines.join('\n')}${more}.`,
+      sources: rows.slice(0, 5).map(row => `reminder:${row.id}`),
+    }
+  }
+
+  if (q.includes('next') && q.includes('reminder') || q.includes('upcoming') && q.includes('reminder')) {
+    const rows = context?.upcomingReminders || []
+    if (!rows.length) return { answer: 'You have no upcoming reminders.', sources: [] }
+    const lines = rows.slice(0, 5).map(row => {
+      const when = formatDate(row.due_at)
+      return when ? `• ${row.title} — ${when}` : `• ${row.title}`
+    })
+    return {
+      answer: `Your next reminders are:\n${lines.join('\n')}`,
+      sources: rows.slice(0, 5).map(row => `reminder:${row.id}`),
+    }
+  }
+
+  if (q.includes('account') && (q.includes('balance') || q.includes('balances') || q.includes('how much'))) {
+    const accounts = context?.accounts || []
+    if (!accounts.length) return { answer: 'You do not have any accounts to show.', sources: [] }
+    const lines = accounts.slice(0, 8).map(account => `• ${account.name}: ${formatInr(account.balance)}`)
+    return {
+      answer: `Your account balances are:\n${lines.join('\n')}`,
+      sources: accounts.slice(0, 8).map(account => `account:${account.id}`),
+    }
+  }
+
+  return null
+}
+
 export async function askBrain(question, context) {
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
   if (sessionError || !sessionData.session?.access_token) {
     throw new Error('AUTH_REQUIRED')
   }
 
-  const response = await fetch(BRAIN_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + sessionData.session.access_token,
-    },
-    body: JSON.stringify({
-      question: String(question || '').trim(),
-      context,
-    }),
-  })
-
-  const body = await response.json().catch(() => ({}))
-
-  if (!response.ok) {
-    if (response.status === 401 || body?.code === 'AUTH_REQUIRED') {
-      throw new Error('AUTH_REQUIRED')
-    }
-    if (response.status === 413) throw new Error('CONTEXT_TOO_LARGE')
-    if (response.status === 500 && body?.code === 'BRAIN_NOT_CONFIGURED') {
-      throw new Error('BRAIN_NOT_CONFIGURED')
-    }
-    throw new Error(body?.error || 'BRAIN_FAILED')
+  const payload = {
+    question: String(question || '').trim(),
+    context,
   }
 
-  return {
-    answer: String(body?.answer || '').trim(),
-    sources: Array.isArray(body?.sources) ? body.sources : [],
+  try {
+    const response = await fetch(BRAIN_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + sessionData.session.access_token,
+      },
+      body: JSON.stringify(payload),
+    })
+
+    const body = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      const fallback = localBrainFallback(question, context)
+      if (fallback) return fallback
+
+      if (response.status === 401 || body?.code === 'AUTH_REQUIRED') {
+        throw new Error('AUTH_REQUIRED')
+      }
+      if (response.status === 413) throw new Error('CONTEXT_TOO_LARGE')
+      if (response.status === 500 && body?.code === 'BRAIN_NOT_CONFIGURED') {
+        throw new Error('BRAIN_NOT_CONFIGURED')
+      }
+      throw new Error(body?.error || 'BRAIN_FAILED')
+    }
+
+    return {
+      answer: String(body?.answer || '').trim(),
+      sources: Array.isArray(body?.sources) ? body.sources : [],
+    }
+  } catch (error) {
+    if (
+      error?.message !== 'AUTH_REQUIRED' &&
+      error?.message !== 'CONTEXT_TOO_LARGE' &&
+      error?.message !== 'BRAIN_NOT_CONFIGURED'
+    ) {
+      const fallback = localBrainFallback(question, context)
+      if (fallback) return fallback
+    }
+    throw error
   }
 }
