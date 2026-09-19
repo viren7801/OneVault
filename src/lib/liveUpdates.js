@@ -1,12 +1,12 @@
 import { Capacitor } from '@capacitor/core'
+import { LiveUpdate } from '@capawesome/capacitor-live-update'
 
-const MANIFEST_URL = '/live-updates/latest.json'
+const MANIFEST_URL = 'https://onevault.patelviren.com/live-updates/latest.json'
 const STATUS_TIMEOUT_MS = 7000
 const READY_TIMEOUT_MS = 10000
 const NEXT_BUNDLE_TIMEOUT_MS = 3000
 const DOWNLOAD_TIMEOUT_MS = 90000
 
-let liveUpdatePromise
 let readyPromise
 
 function withTimeout(promise, timeoutMs, message) {
@@ -22,17 +22,7 @@ function withTimeout(promise, timeoutMs, message) {
 async function getLiveUpdatePlugin() {
   if (!Capacitor.isNativePlatform()) return null
   if (!Capacitor.isPluginAvailable('LiveUpdate')) return null
-
-  if (!liveUpdatePromise) {
-    liveUpdatePromise = import('@capawesome/capacitor-live-update')
-      .then(module => module.LiveUpdate)
-  }
-
-  return withTimeout(
-    liveUpdatePromise,
-    STATUS_TIMEOUT_MS,
-    'Live update service is taking too long to respond.',
-  )
+  return LiveUpdate
 }
 
 function isValidManifest(value) {
