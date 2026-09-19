@@ -3746,3 +3746,15 @@ body{overscroll-behavior-x:none}
     border-radius: 13px;
   }
 }
+
+
+/* --- Calendar tap behavior on phones --- */
+@media (max-width:760px) {
+  .calendar-preview {
+    display: none !important;
+  }
+
+  .calendar-day {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
