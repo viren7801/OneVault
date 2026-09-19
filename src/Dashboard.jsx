@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import {
   Bell, CalendarClock, ChevronRight, CircleDollarSign, LockKeyhole,
   NotebookPen, PiggyBank, Plus, ShieldCheck, TrendingDown, TrendingUp, WalletCards,
+  Activity,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 
@@ -75,6 +76,15 @@ export default function Dashboard({ user, onNavigate, onQuickAdd, onOpenSecurity
     const totalBalance = accounts.reduce((sum, item) => sum + Number(item.balance), 0)
     return { income, expenses, net: income - expenses, totalBalance }
   }, [transactions, accounts])
+
+  const recentActivity = useMemo(() => {
+    return transactions.slice(0, 5).map(item => ({
+      ...item,
+      label: item.description || item.category || 'Pocket transaction',
+      amountLabel: (item.type === 'income' ? '+ ' : '− ') + money(item.amount),
+      dateLabel: new Date(item.spent_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+    }))
+  }, [transactions])
 
   const budgetProgress = useMemo(() => {
     const rows = budgets.map(budget => {
@@ -157,6 +167,34 @@ export default function Dashboard({ user, onNavigate, onQuickAdd, onOpenSecurity
         <div className="dashboard-card-muted">Registered device{passkeys === 1 ? '' : 's'} · auto-lock {autoLockMinutes ? autoLockMinutes + 'm' : 'off'}</div>
         <div className="dashboard-security-note"><CalendarClock size={12}/> Sensitive vaults lock when you leave this tab.</div>
       </button>
+    </div>
+
+    <div className="dashboard-card dashboard-activity-card">
+      <div className="dashboard-card-top">
+        <span className="dashboard-icon"><Activity size={17}/></span>
+        <button className="dashboard-inline-link" onClick={(event)=>{event.stopPropagation(); onNavigate('pocket')}}>Open Pocket <ChevronRight size={13}/></button>
+      </div>
+      <div className="dashboard-activity-heading">
+        <div>
+          <strong>Recent activity</strong>
+          <span>Latest money movements this month</span>
+        </div>
+        <span className="dashboard-activity-count">{recentActivity.length}</span>
+      </div>
+      <div className="dashboard-activity-list">
+        {recentActivity.length === 0
+          ? <span className="dashboard-empty-line">No Pocket activity this month.</span>
+          : recentActivity.map(item => (
+            <button key={item.id} className="dashboard-activity-row" onClick={(event)=>{event.stopPropagation(); onNavigate('pocket')}}>
+              <span className={`dashboard-activity-dot ${item.type === 'income' ? 'income' : 'expense'}`}></span>
+              <span className="dashboard-activity-copy">
+                <strong>{item.label}</strong>
+                <small>{item.category || (item.type === 'income' ? 'Income' : 'Expense')} · {item.dateLabel}</small>
+              </span>
+              <strong className={`dashboard-activity-amount ${item.type === 'income' ? 'income' : 'expense'}`}>{item.amountLabel}</strong>
+            </button>
+          ))}
+      </div>
     </div>
 
     <div className="dashboard-footer-row">
