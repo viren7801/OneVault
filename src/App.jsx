@@ -1010,6 +1010,8 @@ function Reminders({ user }) {
   function selectCalendarDate(day) {
     const nextDate = startOfDay(day)
     setSelectedDate(nextDate)
+    setHoveredDate(reminderDateKey(day))
+    hoverVibrationRef.current = reminderDateKey(day)
     try {
       if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
         navigator.vibrate([10, 18, 14])
