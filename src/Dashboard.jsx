@@ -106,7 +106,7 @@ export default function Dashboard({ user, onNavigate, onQuickAdd, onOpenSecurity
       return {
         period: 'Evening',
         greeting: 'Good evening.',
-        message: 'Wrap up the day without losing sight of what is next.',
+        message: 'Wrap up the day without losing sight of what is next. • Live update test is ready.',
         focus: 'Wind down.',
       }
     }
