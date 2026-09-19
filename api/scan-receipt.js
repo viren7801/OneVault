@@ -54,7 +54,7 @@ function setCors(res) {
 
 async function authenticateRequest(req) {
   const authorization = req.headers.authorization || ''
-  const match = authorization.match(/^Bearer\\s+(.+)$/i)
+  const match = authorization.match(/^Bearer\s+(.+)$/i)
   if (!match) return null
 
   const supabaseUrl = process.env.VITE_SUPABASE_URL
@@ -66,7 +66,7 @@ async function authenticateRequest(req) {
     throw new Error('SUPABASE_SERVER_NOT_CONFIGURED')
   }
 
-  const response = await fetch(`${supabaseUrl.replace(/\\/$/, '')}/auth/v1/user`, {
+  const response = await fetch(`${supabaseUrl.replace(/\/$/, '')}/auth/v1/user`, {
     headers: {
       apikey: supabaseKey,
       Authorization: `Bearer ${match[1]}`,
@@ -97,22 +97,22 @@ function readJsonBody(req) {
 
 function normalizeJson(text) {
   const cleaned = String(text || '')
-    .replace(/^\\s*\`\`\`json\\s*/i, '')
-    .replace(/^\\s*\`\`\`\\s*/i, '')
-    .replace(/\\s*\`\`\`\\s*$/i, '')
+    .replace(/^\s*\`\`\`json\s*/i, '')
+    .replace(/^\s*\`\`\`\s*/i, '')
+    .replace(/\s*\`\`\`\s*$/i, '')
     .trim()
 
   try {
     return JSON.parse(cleaned)
   } catch {
-    const match = cleaned.match(/\\{[\\s\\S]*\\}/)
+    const match = cleaned.match(/\{[\s\S]*\}/)
     if (!match) throw new Error('INVALID_JSON')
     return JSON.parse(match[0])
   }
 }
 
 function normalizeDate(value) {
-  if (typeof value === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(value)) {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return value
   }
   return null
