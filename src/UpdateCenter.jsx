@@ -28,11 +28,12 @@ export default function UpdateCenter() {
     try {
       const status = await getLiveUpdateStatus()
       setLatest(status)
-      if (status.available) {
+      if (!status.supported) {
+        setState('error')
+        setMessage('Live updates are unavailable in this native build.')
+      } else if (status.available) {
         setState('available')
-        setMessage(status.staged
-          ? 'The latest update is already downloaded. Tap Update now to apply it.'
-          : 'A new OneVault update is ready to install.')
+        setMessage('A new OneVault update is ready to install.')
       } else {
         setState('current')
         setMessage('You are already using the latest app update.')
@@ -116,14 +117,14 @@ export default function UpdateCenter() {
         </div>}
 
         <div className="update-center-actions">
-          <button className="secondary-btn" onClick={() => void check()} disabled={state === 'checking' || state === 'downloading' || state === 'restarting'}>
-            <RefreshCw size={14} className={state === 'checking' ? 'update-spin' : ''} /> Check again
-          </button>
           {state === 'available' && <button className="primary-btn" onClick={() => void updateNow()}>
             <DownloadCloud size={15} /> Update now
           </button>}
-          {(state === 'current' || state === 'error') && <button className="primary-btn" onClick={() => void check()} disabled={state === 'checking'}>
-            {state === 'error' ? <RefreshCw size={15} /> : <Check size={15} />} Check again
+          {(state === 'idle' || state === 'current' || state === 'error') && <button className="primary-btn" onClick={() => void check()} disabled={state === 'checking'}>
+            {state === 'error' ? <RefreshCw size={15} /> : state === 'current' ? <Check size={15} /> : <RefreshCw size={15} />} {state === 'error' ? 'Try again' : 'Check for updates'}
+          </button>}
+          {(state === 'checking' || state === 'downloading' || state === 'restarting') && <button className="secondary-btn" disabled>
+            <RefreshCw size={14} className="update-spin" /> {state === 'checking' ? 'Checking…' : state === 'downloading' ? 'Downloading…' : 'Applying…'}
           </button>}
         </div>
 
