@@ -47,7 +47,7 @@ export default function PasskeyManager({ open, onClose, user, autoLockMinutes, o
       const { error: registerError } = await registerNativeAwarePasskey()
       if (registerError) throw registerError
       await load()
-      setNotice('This device is now registered for oneVault sign-in.')
+      setNotice('This device is now registered for OneVault sign-in.')
     } catch (err) {
       setError(err.message || 'Device registration was cancelled or failed.')
     } finally {
@@ -89,7 +89,7 @@ export default function PasskeyManager({ open, onClose, user, autoLockMinutes, o
 
   async function revoke(passkey) {
     const label = passkey.friendly_name || 'this device'
-    if (!window.confirm('Remove “' + label + '” from oneVault sign-in? You will not be able to use that passkey here again.')) return
+    if (!window.confirm('Remove “' + label + '” from OneVault sign-in? You will not be able to use that passkey here again.')) return
 
     setBusy(true)
     setError('')
@@ -114,7 +114,7 @@ export default function PasskeyManager({ open, onClose, user, autoLockMinutes, o
         <div>
           <div className="panel-kicker">DEVICE SECURITY</div>
           <h3>Passkeys & trusted devices</h3>
-          <p className="modal-subtle">Use your device biometric or passkey for private oneVault access.</p>
+          <p className="modal-subtle">Use your device biometric or passkey for private OneVault access.</p>
         </div>
         <button className="icon-btn" onClick={onClose}><X size={18}/></button>
       </div>
@@ -136,7 +136,7 @@ export default function PasskeyManager({ open, onClose, user, autoLockMinutes, o
           <div className="device-security-empty">
             <KeyRound size={22}/>
             <strong>No passkeys yet.</strong>
-            <span>Add this device and oneVault can use its built-in biometric/security prompt on future logins.</span>
+            <span>Add this device and OneVault can use its built-in biometric/security prompt on future logins.</span>
           </div>
         ) : passkeys.map(passkey => (
           <div className="device-security-row" key={passkey.id}>
@@ -177,7 +177,7 @@ export default function PasskeyManager({ open, onClose, user, autoLockMinutes, o
             <option value="0">Never</option>
           </select>
         </div>
-        <span>Your private passkey key stays with your authenticator. oneVault receives only the verification needed to create a Supabase session.</span>
+        <span>Your private passkey key stays with your authenticator. OneVault receives only the verification needed to create a Supabase session.</span>
         <div className="modal-actions"><button className="secondary-btn" onClick={onLockNow}><Lock size={14}/> Lock now</button>
           <button className="secondary-btn" onClick={onClose}>Done</button>
           <button className="primary-btn" onClick={()=>void addDevice()} disabled={busy}>{busy ? (Capacitor.isNativePlatform() ? 'Authenticating…' : 'Waiting for device…') : (Capacitor.isNativePlatform() ? 'Enable fingerprint / face unlock' : 'Add this device')}</button>
