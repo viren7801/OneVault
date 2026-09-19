@@ -96,3 +96,30 @@
   .update-center-meta{flex-direction:column;gap:5px}
   .update-center-footnote{font-size:9px}
 }
+
+
+.update-center-live-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  width:max-content;
+  margin-top:16px;
+  padding:6px 9px;
+  border:1px solid rgba(127,195,155,.20);
+  border-radius:999px;
+  background:rgba(127,195,155,.07);
+  color:#9ad2b0;
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.12em;
+}
+.update-live-dot{
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:#79d6a2;
+  box-shadow:0 0 0 4px rgba(121,214,162,.09);
+}
+@media (max-width:760px){
+  .update-center-live-badge{margin-top:12px}
+}
