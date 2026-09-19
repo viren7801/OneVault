@@ -351,8 +351,13 @@ function Pocket({ user, onQuickAdd }) {
   useEffect(() => { load() }, [])
   useEffect(() => {
     function handleOpen(event) { setTransactionModal({ type: event.detail || 'expense' }) }
+    function handleReceiptScan() { setScanReceiptOpen(true) }
     window.addEventListener('onevault:open-transaction', handleOpen)
-    return () => window.removeEventListener('onevault:open-transaction', handleOpen)
+    window.addEventListener('onevault:open-receipt', handleReceiptScan)
+    return () => {
+      window.removeEventListener('onevault:open-transaction', handleOpen)
+      window.removeEventListener('onevault:open-receipt', handleReceiptScan)
+    }
   }, [])
 
   const currentMonth = monthKey(new Date())
@@ -1135,6 +1140,20 @@ function App() {
       run: () => { setCommandOpen(false); setCommandQuery(''); setQuickAdd(true) },
     },
     {
+      id: 'scan-receipt',
+      label: 'Scan receipt',
+      description: 'Use Claude to turn a receipt photo into a Pocket entry',
+      icon: ScanLine,
+      keywords: 'scan receipt camera gallery ai claude expense pocket',
+      run: () => {
+        setActive('pocket')
+        setMobileOpen(false)
+        setCommandOpen(false)
+        setCommandQuery('')
+        window.setTimeout(() => window.dispatchEvent(new CustomEvent('onevault:open-receipt')), 40)
+      },
+    },
+    {
       id: 'security',
       label: 'Security',
       description: 'Manage passkeys and auto-lock',
@@ -1255,7 +1274,7 @@ function App() {
         })}
       </nav>
     </main>
-    {quickAdd&&<div className="modal-layer"><div className="modal quick-add-modal"><div className="modal-header"><div><div className="panel-kicker">QUICK ADD</div><h3>What do you want to create?</h3><p className="modal-subtle">Choose the workspace item you want to add.</p></div><button className="icon-btn" onClick={()=>setQuickAdd(false)}><X size={18}/></button></div><div className="quick-grid">{modules.filter(m=>m.id!=='home').map(m=>{const Icon=m.icon;return <button key={m.id} className="quick-option" onClick={()=>quickCreate(m.id)}><span className="module-icon"><Icon size={20}/></span><span><strong>{m.label}</strong><small>{m.description}</small></span><ChevronRight size={15}/></button>})}</div></div></div>}
+    {quickAdd&&<div className="modal-layer"><div className="modal quick-add-modal"><div className="modal-header"><div><div className="panel-kicker">QUICK ADD</div><h3>What do you want to create?</h3><p className="modal-subtle">Choose the workspace item you want to add.</p></div><button className="icon-btn" onClick={()=>setQuickAdd(false)}><X size={18}/></button></div><div className="quick-grid">{modules.filter(m=>m.id!=='home').map(m=>{const Icon=m.icon;return <button key={m.id} className="quick-option" onClick={()=>quickCreate(m.id)}><span className="module-icon"><Icon size={20}/></span><span><strong>{m.label}</strong><small>{m.description}</small></span><ChevronRight size={15}/></button>})}<button className="quick-option" onClick={()=>{setQuickAdd(false);setActive('pocket');window.setTimeout(()=>window.dispatchEvent(new CustomEvent('onevault:open-receipt')),40)}}><span className="module-icon"><ScanLine size={20}/></span><span><strong>Scan receipt</strong><small>Claude extracts the expense from a photo</small></span><ChevronRight size={15}/></button></div></div></div>}
     {commandOpen&&<div className="modal-layer command-layer" onMouseDown={()=>setCommandOpen(false)}>
       <div className="command-palette" onMouseDown={event=>event.stopPropagation()}>
         <div className="command-search-row">
