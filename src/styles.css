@@ -1994,6 +1994,7 @@ body{overscroll-behavior-x:none}
 /* --- Advanced Pocket search --- */
 .transactions-panel {
   position: relative;
+  overflow: visible;
 }
 
 .advanced-transaction-filters {
