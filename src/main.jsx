@@ -1,4 +1,5 @@
 import React from 'react';
+import { Capacitor } from '@capacitor/core';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './styles.css';
@@ -20,6 +21,11 @@ function clearDevelopmentServiceWorker() {
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     if (import.meta.env.DEV) {
+      void clearDevelopmentServiceWorker();
+      return;
+    }
+
+    if (Capacitor.isNativePlatform()) {
       void clearDevelopmentServiceWorker();
       return;
     }
