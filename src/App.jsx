@@ -132,6 +132,13 @@ function ScanReceiptModal({ onClose, onExtracted }) {
   const cameraInputRef = useRef(null)
   const galleryInputRef = useRef(null)
 
+  function clearSelectedFile() {
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    setFile(null)
+    setPreviewUrl('')
+    setError('')
+  }
+
   function chooseFile(nextFile) {
     if (!nextFile) return
     if (!nextFile.type?.startsWith('image/')) {
@@ -246,7 +253,7 @@ function ScanReceiptModal({ onClose, onExtracted }) {
             <button
               type="button"
               className="secondary-btn"
-              onClick={()=>chooseFile(null)}
+              onClick={clearSelectedFile}
               disabled={loading}
             >
               Change
