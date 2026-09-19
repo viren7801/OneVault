@@ -868,19 +868,22 @@ function App() {
 
   useEffect(() => {
     let mounted = true
-    let authEventDuringBootstrap = false
 
-    // Register the listener before getSession() so a fast password/biometric
-    // sign-in cannot be overwritten by a slower bootstrap call returning null.
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Native startup intentionally ignores the WebView's persisted Supabase
+    // session. OneVault must always enter through device authentication after
+    // an app/update restart. Real SIGNED_IN / SIGNED_OUT events are still
+    // handled normally so password and biometric login cannot be overwritten.
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return
 
-      authEventDuringBootstrap = true
+      if (Capacitor.isNativePlatform() && event === 'INITIAL_SESSION') {
+        setUser(null)
+        setAuthLoading(false)
+        return
+      }
 
       if (Capacitor.isNativePlatform()) {
         if (session) {
-          // Keep the secure native session synchronized, but do not make the
-          // UI wait for secure-storage I/O.
           void persistNativeSession(session)
           setUser(session.user)
         } else {
@@ -894,43 +897,15 @@ function App() {
     })
 
     async function bootstrapAuth() {
+      if (Capacitor.isNativePlatform()) {
+        setUser(null)
+        setAuthLoading(false)
+        return
+      }
+
       try {
-        // Native builds keep the real session in Android/iOS secure storage.
-        // On launch, automatically offer the registered device unlock so an
-        // app restart or Live Update does not look like the device was logged out.
-        if (Capacitor.isNativePlatform()) {
-          const device = await getNativeDeviceStatus()
-
-          if (!mounted || authEventDuringBootstrap) return
-
-          if (device.registered) {
-            const unlockResult = await signInWithNativeAwarePasskey()
-
-            if (!mounted || authEventDuringBootstrap) return
-
-            if (unlockResult?.data?.user && !unlockResult?.error) {
-              setUser(unlockResult.data.user)
-              return
-            }
-          }
-
-          // Clean up any stale WebView-only session without deleting the
-          // protected device session used by fingerprint/face unlock.
-          const { data, error } = await supabase.auth.getSession()
-
-          if (!mounted || authEventDuringBootstrap) return
-
-          if (!error && data.session) {
-            await persistNativeSession(data.session)
-            if (mounted) await supabase.auth.signOut({ scope: 'local' })
-          }
-
-          if (mounted) setUser(null)
-          return
-        }
-
         const { data } = await supabase.auth.getSession()
-        if (!mounted || authEventDuringBootstrap) return
+        if (!mounted) return
         setUser(data.session?.user || null)
       } catch (bootstrapError) {
         console.warn('[OneVault] auth bootstrap failed:', bootstrapError?.message || bootstrapError)
