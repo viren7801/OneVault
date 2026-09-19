@@ -3003,3 +3003,75 @@ body{overscroll-behavior-x:none}
   }
   .brain-topbar-btn span { display: none; }
 }
+
+
+/* --- Brain answer modes --- */
+.brain-mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.brain-mode-toggle {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 11px;
+  background: rgba(255,255,255,.018);
+}
+
+.brain-mode-toggle button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 8px;
+  color: #74747e;
+  background: transparent;
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.brain-mode-toggle button:hover {
+  color: #eaeaf0;
+}
+
+.brain-mode-toggle button.active {
+  color: #111116;
+  background: #f3f3f6;
+}
+
+.brain-mode-hint {
+  color: #676771;
+  font-size: 8px;
+  line-height: 1.4;
+  text-align: right;
+}
+
+@media (max-width:760px) {
+  .brain-mode-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .brain-mode-toggle {
+    width: 100%;
+  }
+
+  .brain-mode-toggle button {
+    flex: 1 1 0;
+  }
+
+  .brain-mode-hint {
+    width: 100%;
+    text-align: left;
+  }
+}
