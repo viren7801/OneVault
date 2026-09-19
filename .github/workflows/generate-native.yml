@@ -18,6 +18,9 @@ permissions:
 
 jobs:
   generate:
+    env:
+      VITE_SUPABASE_URL: "https://gskxfpuotdynbeokruhj.supabase.co"
+      VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_CrOQDv7o5DNUBiw0PKZhPg_aq8H9eTD"
     if: ${{ !contains(github.event.head_commit.message, '[native-generated]') }}
     runs-on: macos-latest
     timeout-minutes: 30
