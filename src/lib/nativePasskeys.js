@@ -1,3 +1,4 @@
+// Native passkey bridge retained in the final Android base build.
 import { Capacitor } from '@capacitor/core'
 import { supabase } from './supabase'
 
