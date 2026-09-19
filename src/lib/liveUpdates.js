@@ -2,9 +2,9 @@ import { Capacitor } from '@capacitor/core'
 import { LiveUpdate } from '@capawesome/capacitor-live-update'
 
 const MANIFEST_URL = 'https://onevault.patelviren.com/live-updates/latest.json'
+const CURRENT_BUNDLE_ID = import.meta.env.VITE_BUILD_ID || null
 const STATUS_TIMEOUT_MS = 7000
 const READY_TIMEOUT_MS = 10000
-const NEXT_BUNDLE_TIMEOUT_MS = 3000
 const DOWNLOAD_TIMEOUT_MS = 90000
 
 let readyPromise
@@ -19,7 +19,7 @@ function withTimeout(promise, timeoutMs, message) {
   ]).finally(() => clearTimeout(timer))
 }
 
-async function getLiveUpdatePlugin() {
+function getLiveUpdatePlugin() {
   if (!Capacitor.isNativePlatform()) return null
   if (!Capacitor.isPluginAvailable('LiveUpdate')) return null
   return LiveUpdate
@@ -68,22 +68,8 @@ async function fetchManifest() {
   }
 }
 
-async function callLiveUpdate(methodName, timeoutMs = STATUS_TIMEOUT_MS, ...args) {
-  const liveUpdate = await getLiveUpdatePlugin()
-
-  if (!liveUpdate || typeof liveUpdate[methodName] !== 'function') {
-    throw new Error('Live updates are unavailable in this build.')
-  }
-
-  return withTimeout(
-    liveUpdate[methodName](...args),
-    timeoutMs,
-    'Live update service is taking too long to respond.',
-  )
-}
-
 export async function initializeLiveUpdates() {
-  const liveUpdate = await getLiveUpdatePlugin()
+  const liveUpdate = getLiveUpdatePlugin()
   if (!liveUpdate) return null
 
   if (!readyPromise) {
@@ -101,31 +87,28 @@ export async function initializeLiveUpdates() {
 }
 
 export async function getLiveUpdateStatus() {
-  const liveUpdate = await getLiveUpdatePlugin()
+  const liveUpdate = getLiveUpdatePlugin()
 
   if (!liveUpdate) {
     return {
       supported: false,
       available: false,
       staged: false,
-      currentBundleId: null,
-      nextBundleId: null,
+      currentBundleId: CURRENT_BUNDLE_ID,
       latestBundleId: null,
+      nextBundleId: null,
     }
   }
 
-  // The plugin readiness call is independent from the manual status check.
-  // Starting it in the background prevents the UI from hanging on ready().
+  // The native readiness call runs independently. Checking the manifest does not
+  // depend on getCurrentBundle(), which can block on some Android WebViews.
   void initializeLiveUpdates()
 
-  const [manifest, current] = await Promise.all([
-    fetchManifest(),
-    callLiveUpdate('getCurrentBundle'),
-  ])
-
-  const currentBundleId = current?.bundleId || null
+  const manifest = await fetchManifest()
+  const currentBundleId = CURRENT_BUNDLE_ID
   const available = Boolean(
     manifest.bundleId &&
+    currentBundleId &&
     manifest.bundleId !== currentBundleId,
   )
 
@@ -142,7 +125,7 @@ export async function getLiveUpdateStatus() {
 }
 
 export async function installLatestLiveUpdate(onProgress) {
-  const liveUpdate = await getLiveUpdatePlugin()
+  const liveUpdate = getLiveUpdatePlugin()
 
   if (!liveUpdate) {
     throw new Error('Live updates are only available in the native OneVault app.')
@@ -151,48 +134,34 @@ export async function installLatestLiveUpdate(onProgress) {
   void initializeLiveUpdates()
 
   const manifest = await fetchManifest()
-  const current = await callLiveUpdate('getCurrentBundle')
+  const currentBundleId = CURRENT_BUNDLE_ID
 
-  if (manifest.bundleId === current?.bundleId) {
+  if (manifest.bundleId === currentBundleId) {
     return {
       updated: false,
       bundleId: manifest.bundleId,
     }
   }
 
-  let nextBundleId = null
+  const listener = await liveUpdate.addListener('downloadBundleProgress', event => {
+    if (event?.bundleId !== manifest.bundleId) return
+    const progress = Math.max(0, Math.min(1, Number(event.progress) || 0))
+    onProgress?.(progress)
+  })
 
   try {
-    const next = await callLiveUpdate(
-      'getNextBundle',
-      NEXT_BUNDLE_TIMEOUT_MS,
+    await withTimeout(
+      liveUpdate.downloadBundle({
+        url: manifest.url,
+        bundleId: manifest.bundleId,
+        artifactType: 'zip',
+        checksum: manifest.checksum,
+      }),
+      DOWNLOAD_TIMEOUT_MS,
+      'The update download timed out. Please try again.',
     )
-    nextBundleId = next?.bundleId || null
-  } catch {
-    // A slow native next-bundle lookup should not prevent an update.
-  }
-
-  if (nextBundleId !== manifest.bundleId) {
-    const listener = await liveUpdate.addListener('downloadBundleProgress', event => {
-      if (event?.bundleId !== manifest.bundleId) return
-      const progress = Math.max(0, Math.min(1, Number(event.progress) || 0))
-      onProgress?.(progress)
-    })
-
-    try {
-      await withTimeout(
-        liveUpdate.downloadBundle({
-          url: manifest.url,
-          bundleId: manifest.bundleId,
-          artifactType: 'zip',
-          checksum: manifest.checksum,
-        }),
-        DOWNLOAD_TIMEOUT_MS,
-        'The update download timed out. Please try again.',
-      )
-    } finally {
-      await listener.remove().catch(() => {})
-    }
+  } finally {
+    await listener.remove().catch(() => {})
   }
 
   await withTimeout(
