@@ -7,6 +7,13 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
   },
+  plugins: {
+    LiveUpdate: {
+      autoUpdateStrategy: 'none',
+      autoBlockRolledBackBundles: true,
+      readyTimeout: 10000,
+    },
+  },
 }
 
 export default config
