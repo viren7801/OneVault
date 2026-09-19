@@ -1,4 +1,8 @@
 name: Generate Native Apps
+concurrency:
+  group: onevault-main-publisher
+  cancel-in-progress: false
+
 
 on:
   push:
