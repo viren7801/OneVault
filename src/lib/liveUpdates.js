@@ -100,12 +100,20 @@ export async function getLiveUpdateStatus() {
     }
   }
 
-  // The native readiness call runs independently. Checking the manifest does not
-  // depend on getCurrentBundle(), which can block on some Android WebViews.
-  void initializeLiveUpdates()
+  await initializeLiveUpdates()
 
   const manifest = await fetchManifest()
-  const currentBundleId = CURRENT_BUNDLE_ID
+  let currentBundleId = CURRENT_BUNDLE_ID
+  try {
+    const current = await withTimeout(
+      liveUpdate.getCurrentBundle(),
+      STATUS_TIMEOUT_MS,
+      'Could not read the current live update bundle.',
+    )
+    currentBundleId = current?.bundleId || currentBundleId
+  } catch {
+    // Fall back to the build-time ID when the native runtime cannot report one.
+  }
   const available = Boolean(
     manifest.bundleId &&
     currentBundleId &&
@@ -131,10 +139,20 @@ export async function installLatestLiveUpdate(onProgress) {
     throw new Error('Live updates are only available in the native OneVault app.')
   }
 
-  void initializeLiveUpdates()
+  await initializeLiveUpdates()
 
   const manifest = await fetchManifest()
-  const currentBundleId = CURRENT_BUNDLE_ID
+  let currentBundleId = CURRENT_BUNDLE_ID
+  try {
+    const current = await withTimeout(
+      liveUpdate.getCurrentBundle(),
+      STATUS_TIMEOUT_MS,
+      'Could not read the current live update bundle.',
+    )
+    currentBundleId = current?.bundleId || currentBundleId
+  } catch {
+    // Fall back to the build-time ID when the native runtime cannot report one.
+  }
 
   if (manifest.bundleId === currentBundleId) {
     return {
@@ -155,7 +173,6 @@ export async function installLatestLiveUpdate(onProgress) {
         url: manifest.url,
         bundleId: manifest.bundleId,
         artifactType: 'zip',
-        checksum: manifest.checksum,
       }),
       DOWNLOAD_TIMEOUT_MS,
       'The update download timed out. Please try again.',
