@@ -359,7 +359,6 @@ export async function scheduleTestNotification() {
           at,
           allowWhileIdle: true,
           isExactNotification: false,
-          foreground: true,
         },
         autoCancel: true,
       }],
