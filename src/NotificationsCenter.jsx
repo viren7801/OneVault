@@ -344,8 +344,19 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
       void loadCenter({ silent: true })
       void syncFromPrefs()
     }, 60000)
+
+    function handleRemindersChanged() {
+      void loadCenter({ silent: true })
+      void syncFromPrefs({ silent: true })
+    }
+
+    window.addEventListener('onevault:reminders-changed', handleRemindersChanged)
     void syncFromPrefs()
-    return () => window.clearInterval(interval)
+
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('onevault:reminders-changed', handleRemindersChanged)
+    }
   }, [user.id, prefs.reminderAlerts, prefs.dailyBrief, prefs.weeklyReview])
 
   useEffect(() => {
