@@ -4,6 +4,7 @@ import { supabase } from './supabase'
 const REMINDER_BASE = 1100000000
 const DAILY_ID = 1199000001
 const WEEKLY_ID = 1199000002
+const TEST_ID = 1199000099
 const MAX_SCHEDULED_REMINDERS = 80
 
 let pluginPromise
@@ -64,6 +65,25 @@ export async function getExactNotificationPermission() {
   }
 }
 
+export async function requestExactNotificationPermission() {
+  const current = await getExactNotificationPermission()
+  if (!current.native || !current.supported || current.granted) return current
+
+  const plugin = await getPlugin()
+  if (!plugin || typeof plugin.changeExactNotificationSetting !== 'function') return current
+
+  try {
+    const changed = await plugin.changeExactNotificationSetting()
+    return {
+      ...current,
+      granted: changed?.exact_alarm === 'granted',
+      supported: true,
+    }
+  } catch {
+    return current
+  }
+}
+
 export async function syncStoredReminderNotifications(userId) {
   if (!userId) return { native: false, scheduled: 0 }
 
@@ -101,7 +121,8 @@ function isOneVaultId(id) {
   return (
     (value >= REMINDER_BASE && value < REMINDER_BASE + 85000000) ||
     value === DAILY_ID ||
-    value === WEEKLY_ID
+    value === WEEKLY_ID ||
+    value === TEST_ID
   )
 }
 
@@ -114,6 +135,11 @@ async function cancelOneVaultNotifications(plugin, pending) {
   if (notifications.length) {
     await plugin.cancel({ notifications })
   }
+}
+
+async function getPendingOneVaultNotifications(plugin) {
+  const pending = await plugin.getPending()
+  return (pending.notifications || []).filter(item => isOneVaultId(item.id))
 }
 
 export async function syncLocalNotifications({
@@ -131,6 +157,19 @@ export async function syncLocalNotifications({
   }
 
   await createChannel(plugin)
+
+  if (reminderAlerts) {
+    const exact = await getExactNotificationPermission()
+    if (exact.supported && !exact.granted) {
+      return {
+        native: true,
+        scheduled: 0,
+        permission: permission.display,
+        exactAlarm: 'denied',
+        requiresExactAlarm: true,
+      }
+    }
+  }
 
   const pending = await plugin.getPending()
   await cancelOneVaultNotifications(plugin, pending.notifications || [])
@@ -151,6 +190,7 @@ export async function syncLocalNotifications({
           hour: 'numeric',
           minute: '2-digit',
         })
+
         notifications.push({
           id: stableReminderId(reminder.id),
           title: reminder.title || 'OneVault reminder',
@@ -162,6 +202,7 @@ export async function syncLocalNotifications({
             at: due,
             allowWhileIdle: true,
             isExactNotification: true,
+            isExactMandatory: true,
           },
           autoCancel: true,
         })
@@ -177,6 +218,7 @@ export async function syncLocalNotifications({
       schedule: {
         on: { hour: 20, minute: 0 },
         repeats: true,
+        isExactNotification: false,
       },
       autoCancel: true,
     })
@@ -191,19 +233,102 @@ export async function syncLocalNotifications({
       schedule: {
         on: { weekday: 1, hour: 18, minute: 0 },
         repeats: true,
+        isExactNotification: false,
       },
       autoCancel: true,
     })
   }
 
-  if (notifications.length) {
-    await plugin.schedule({ notifications })
+  if (!notifications.length) {
+    return {
+      native: true,
+      scheduled: 0,
+      permission: permission.display,
+      exactAlarm: 'not_required',
+      pending: 0,
+    }
   }
 
-  return {
-    native: true,
-    scheduled: notifications.length,
-    permission: permission.display,
+  try {
+    const result = await plugin.schedule({ notifications })
+    const pendingAfter = await getPendingOneVaultNotifications(plugin)
+    const pendingIds = new Set(pendingAfter.map(item => Number(item.id)))
+    const missingIds = notifications
+      .map(item => Number(item.id))
+      .filter(id => !pendingIds.has(id))
+
+    return {
+      native: true,
+      scheduled: result.notifications?.length || 0,
+      permission: permission.display,
+      exactAlarm: reminderAlerts ? 'granted' : 'not_required',
+      pending: pendingAfter.length,
+      missing: missingIds.length,
+      warning: result.warning || null,
+    }
+  } catch (error) {
+    return {
+      native: true,
+      scheduled: 0,
+      permission: permission.display,
+      exactAlarm: reminderAlerts ? 'unknown' : 'not_required',
+      error: error?.message || 'Unable to schedule local notifications.',
+    }
+  }
+}
+
+export async function scheduleTestNotification() {
+  const plugin = await getPlugin()
+  if (!plugin) return { native: false, scheduled: 0, reason: 'not_native' }
+
+  const permission = await requestNotificationPermission()
+  if (!permission.granted) {
+    return { native: true, scheduled: 0, reason: 'notification_permission' }
+  }
+
+  const exact = await getExactNotificationPermission()
+  if (exact.supported && !exact.granted) {
+    return { native: true, scheduled: 0, reason: 'exact_alarm_permission' }
+  }
+
+  await createChannel(plugin)
+  const at = new Date(Date.now() + 10000)
+
+  try {
+    await cancelOneVaultNotifications(plugin, await plugin.getPending().then(result => result.notifications || []))
+
+    const result = await plugin.schedule({
+      notifications: [{
+        id: TEST_ID,
+        title: 'OneVault test notification',
+        body: 'If you see this, phone notifications are working.',
+        channelId: 'onevault_reminders',
+        schedule: {
+          at,
+          allowWhileIdle: true,
+          isExactNotification: true,
+          isExactMandatory: true,
+        },
+        autoCancel: true,
+      }],
+    })
+
+    const pendingAfter = await getPendingOneVaultNotifications(plugin)
+    const scheduled = pendingAfter.some(item => Number(item.id) === TEST_ID)
+
+    return {
+      native: true,
+      scheduled: scheduled ? 1 : 0,
+      reason: scheduled ? 'scheduled' : 'not_pending',
+      warning: result.warning || null,
+    }
+  } catch (error) {
+    return {
+      native: true,
+      scheduled: 0,
+      reason: 'schedule_error',
+      error: error?.message || 'Unable to schedule test notification.',
+    }
   }
 }
 
