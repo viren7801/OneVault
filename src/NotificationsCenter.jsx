@@ -24,7 +24,7 @@ const PREF_KEY = userId => 'onevault:notification-prefs:' + userId
 const READ_KEY = userId => 'onevault:notification-read:' + userId
 
 const DEFAULT_PREFS = {
-  reminderAlerts: false,
+  reminderAlerts: true,
   dailyBrief: false,
   weeklyReview: false,
 }
