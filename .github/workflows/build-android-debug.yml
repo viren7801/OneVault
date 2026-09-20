@@ -3,6 +3,7 @@ concurrency:
   group: onevault-main-publisher
   cancel-in-progress: false
 
+# Native notification diagnostic build: always include current native notification test fixes.
 # Final native base build: Update Center is included in the web layer.
 
 on:
