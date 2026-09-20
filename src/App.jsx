@@ -1386,12 +1386,22 @@ function App() {
 
     void syncStoredReminderNotifications(user.id).catch(() => {})
 
+    const syncNativeReminders = () => {
+      void syncStoredReminderNotifications(user.id).then(result => {
+        if (result?.requiresExactAlarm) {
+          console.warn('[OneVault] exact alarms are disabled; reminders are not armed until phone alarm access is enabled')
+        }
+      }).catch(error => {
+        console.warn('[OneVault] native reminder sync failed:', error?.message || error)
+      })
+    }
+
     const handleRemindersChanged = () => {
-      void syncStoredReminderNotifications(user.id).catch(() => {})
+      syncNativeReminders()
     }
     const handleForeground = () => {
       if (document.visibilityState !== 'visible') return
-      void syncStoredReminderNotifications(user.id).catch(() => {})
+      syncNativeReminders()
     }
     window.addEventListener('onevault:reminders-changed', handleRemindersChanged)
     window.addEventListener('focus', handleForeground)
