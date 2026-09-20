@@ -12,8 +12,11 @@ import {
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import {
+  getExactNotificationPermission,
   getNotificationPermission,
+  requestExactNotificationPermission,
   requestNotificationPermission,
+  scheduleTestNotification,
   syncLocalNotifications,
 } from './lib/localNotifications'
 
@@ -90,6 +93,7 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
   const [readIds, setReadIds] = useState(() => loadReadIds(user.id))
   const [loading, setLoading] = useState(false)
   const [devicePermission, setDevicePermission] = useState({ granted: false, native: false })
+  const [exactPermission, setExactPermission] = useState({ granted: true, native: false, supported: false })
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
 
@@ -225,9 +229,15 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
 
   async function refreshPermission() {
     try {
-      setDevicePermission(await getNotificationPermission())
+      const [notification, exact] = await Promise.all([
+        getNotificationPermission(),
+        getExactNotificationPermission(),
+      ])
+      setDevicePermission(notification)
+      setExactPermission(exact)
     } catch {
       setDevicePermission({ granted: false, native: false })
+      setExactPermission({ granted: true, native: false, supported: false })
     }
   }
 
@@ -236,8 +246,17 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
       const result = await requestNotificationPermission()
       setDevicePermission({ granted: result.granted, native: result.native })
       if (!result.granted) {
-        setNotice('Device notifications are not enabled. You can allow them in Android/iPhone settings.')
+        setNotice('Device notifications are not enabled. Allow them in your phone settings, then try again.')
         return
+      }
+
+      if (prefs.reminderAlerts) {
+        const exact = await requestExactNotificationPermission()
+        setExactPermission(exact)
+        if (exact.supported && !exact.granted) {
+          setNotice('Exact alarms are required for on-time reminders. Enable “Alarms & reminders” for OneVault, then press Enable again.')
+          return
+        }
       }
 
       const { data: reminders } = await supabase
@@ -247,16 +266,55 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
         .order('due_at', { ascending: true })
         .limit(1000)
 
-      await syncLocalNotifications({
+      const syncResult = await syncLocalNotifications({
         reminders: reminders || [],
         reminderAlerts: prefs.reminderAlerts,
         dailyBrief: prefs.dailyBrief,
         weeklyReview: prefs.weeklyReview,
       })
 
-      setNotice('Device notifications are enabled.')
+      if (syncResult.requiresExactAlarm) {
+        setNotice('OneVault cannot arm exact reminders until “Alarms & reminders” is enabled for the app.')
+        return
+      }
+
+      if (syncResult.missing) {
+        setNotice('OneVault could not verify every scheduled reminder on this device. Open Notifications again to resync.')
+        return
+      }
+
+      setNotice('Device notifications are enabled' + (prefs.reminderAlerts ? ' · ' + syncResult.scheduled + ' reminder' + (syncResult.scheduled === 1 ? '' : 's') + ' armed' : '') + '.')
     } catch (syncError) {
       setError(syncError.message || 'Could not enable notifications.')
+    }
+  }
+
+  async function testNotification() {
+    setNotice('')
+    setError('')
+
+    try {
+      const result = await scheduleTestNotification()
+      await refreshPermission()
+
+      if (result.reason === 'notification_permission') {
+        setNotice('Notification permission is still off. Allow OneVault notifications in your phone settings and try again.')
+        return
+      }
+
+      if (result.reason === 'exact_alarm_permission') {
+        setNotice('Exact alarms are off. Enable “Alarms & reminders” for OneVault, then press Test notification again.')
+        return
+      }
+
+      if (result.scheduled) {
+        setNotice('Test notification scheduled for about 10 seconds from now.')
+        return
+      }
+
+      setNotice('The test notification could not be verified as pending on this device.')
+    } catch (testError) {
+      setError(testError.message || 'Could not schedule a test notification.')
     }
   }
 
@@ -276,12 +334,16 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
         .order('due_at', { ascending: true })
         .limit(1000)
 
-      await syncLocalNotifications({
+      const result = await syncLocalNotifications({
         reminders: reminders || [],
         reminderAlerts: prefs.reminderAlerts,
         dailyBrief: prefs.dailyBrief,
         weeklyReview: prefs.weeklyReview,
       })
+
+      if (!silent && result.requiresExactAlarm) {
+        setError('Exact alarms are disabled for OneVault. Enable “Alarms & reminders” in phone settings so reminders can fire on time.')
+      }
     } catch (syncError) {
       if (!silent) setError(syncError.message || 'Could not refresh device notifications.')
     }
@@ -301,6 +363,18 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
         savePrefs(user.id, reverted)
         setNotice('Notification permission was not granted.')
         return
+      }
+
+      if (key === 'reminderAlerts') {
+        const exact = await requestExactNotificationPermission()
+        setExactPermission(exact)
+        if (exact.supported && !exact.granted) {
+          const reverted = { ...next, [key]: false }
+          setPrefs(reverted)
+          savePrefs(user.id, reverted)
+          setNotice('Enable “Alarms & reminders” for OneVault before turning on reminder alerts.')
+          return
+        }
       }
     }
 
@@ -338,7 +412,7 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
   }
 
   useEffect(() => {
-    refreshPermission()
+    void refreshPermission()
     void loadCenter()
     const interval = window.setInterval(() => {
       void loadCenter({ silent: true })
@@ -350,12 +424,21 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
       void syncFromPrefs({ silent: true })
     }
 
+    function handleForeground() {
+      void refreshPermission()
+      void syncFromPrefs({ silent: true })
+    }
+
     window.addEventListener('onevault:reminders-changed', handleRemindersChanged)
+    window.addEventListener('focus', handleForeground)
+    document.addEventListener('visibilitychange', handleForeground)
     void syncFromPrefs()
 
     return () => {
       window.clearInterval(interval)
       window.removeEventListener('onevault:reminders-changed', handleRemindersChanged)
+      window.removeEventListener('focus', handleForeground)
+      document.removeEventListener('visibilitychange', handleForeground)
     }
   }, [user.id, prefs.reminderAlerts, prefs.dailyBrief, prefs.weeklyReview])
 
@@ -399,12 +482,25 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
 
             <div className="notification-device-card">
               <div>
-                <strong>{devicePermission.granted ? 'Device notifications on' : 'Device notifications off'}</strong>
-                <span>{devicePermission.granted ? 'OneVault can alert you even when the app is closed.' : 'Enable alerts for reminders and scheduled reviews.'}</span>
+                <strong>
+                  {devicePermission.granted
+                    ? (prefs.reminderAlerts && exactPermission.supported && !exactPermission.granted ? 'Reminder alarms need access' : 'Device notifications on')
+                    : 'Device notifications off'}
+                </strong>
+                <span>
+                  {devicePermission.granted
+                    ? (prefs.reminderAlerts && exactPermission.supported && !exactPermission.granted
+                      ? 'Enable “Alarms & reminders” so scheduled reminders can fire exactly on time.'
+                      : 'OneVault can alert you even when the app is closed.')
+                    : 'Enable alerts for reminders and scheduled reviews.'}
+                </span>
               </div>
-              <button className={devicePermission.granted ? 'secondary-btn' : 'primary-btn'} onClick={()=>void syncDevice()}>
-                {devicePermission.granted ? 'Refresh' : 'Enable'}
-              </button>
+              <div className="notification-device-actions">
+                <button className="secondary-btn" onClick={()=>void testNotification}>Test</button>
+                <button className={devicePermission.granted ? 'secondary-btn' : 'primary-btn'} onClick={()=>void syncDevice()}>
+                  {devicePermission.granted ? (prefs.reminderAlerts && exactPermission.supported && !exactPermission.granted ? 'Allow alarms' : 'Refresh') : 'Enable'}
+                </button>
+              </div>
             </div>
 
             <div className="notification-settings">
