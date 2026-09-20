@@ -13,6 +13,7 @@ import {
 import { supabase } from './lib/supabase'
 import {
   getExactNotificationPermission,
+  getNotificationDiagnostics,
   getNotificationPermission,
   requestExactNotificationPermission,
   requestNotificationPermission,
@@ -278,6 +279,19 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
         return
       }
 
+      if (syncResult.error) {
+        setError(
+          'Native notification scheduling failed' +
+          (syncResult.errorCode ? ' [' + syncResult.errorCode + ']' : '') +
+          ': ' + syncResult.error
+        )
+        return
+      }
+
+      if (syncResult.warningMessage) {
+        setNotice('Notification scheduling warning: ' + syncResult.warningMessage)
+      }
+
       if (syncResult.missing) {
         setNotice('OneVault could not verify every scheduled reminder on this device. Open Notifications again to resync.')
         return
@@ -297,22 +311,47 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
       const result = await scheduleTestNotification()
       await refreshPermission()
 
+      if (result.reason === 'not_native') {
+        setError('This is the web/dev version. Native phone notifications only work in the installed OneVault app.')
+        return
+      }
+
+      if (result.reason === 'plugin_unavailable') {
+        setError('The installed OneVault native build does not contain the Local Notifications plugin. Rebuild/reinstall the native app after running “npx cap sync”.')
+        return
+      }
+
       if (result.reason === 'notification_permission') {
         setNotice('Notification permission is still off. Allow OneVault notifications in your phone settings and try again.')
         return
       }
 
-      if (result.reason === 'exact_alarm_permission') {
-        setNotice('Exact alarms are off. Enable “Alarms & reminders” for OneVault, then press Test notification again.')
+      if (result.reason === 'schedule_error') {
+        setError(
+          'Test notification failed' +
+          (result.errorCode ? ' [' + result.errorCode + ']' : '') +
+          ': ' + (result.error || 'Unknown native scheduling error.')
+        )
         return
       }
 
       if (result.scheduled) {
-        setNotice('Test notification scheduled for about 10 seconds from now.')
+        setNotice('Test notification scheduled for about 10 seconds from now. Keep an eye on the notification tray.')
         return
       }
 
-      setNotice('The test notification could not be verified as pending on this device.')
+      const diagnostics = result.diagnostics || await getNotificationDiagnostics().catch(() => null)
+      const pendingCount = diagnostics?.pending?.length ?? 0
+      const deliveredCount = diagnostics?.delivered?.length ?? 0
+      const channelCount = diagnostics?.channels?.length ?? 0
+      setError(
+        'The notification was not left pending. ' +
+        'enabled=' + String(diagnostics?.enabled ?? false) +
+        ', permission=' + String(diagnostics?.permission ?? 'unknown') +
+        ', channels=' + String(channelCount) +
+        ', pending=' + String(pendingCount) +
+        ', delivered=' + String(deliveredCount) + '.'
+      )
     } catch (testError) {
       setError(testError.message || 'Could not schedule a test notification.')
     }
@@ -343,6 +382,12 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
 
       if (!silent && result.requiresExactAlarm) {
         setError('Exact alarms are disabled for OneVault. Enable “Alarms & reminders” in phone settings so reminders can fire on time.')
+      } else if (!silent && result.error) {
+        setError(
+          'Notification sync failed' +
+          (result.errorCode ? ' [' + result.errorCode + ']' : '') +
+          ': ' + result.error
+        )
       }
     } catch (syncError) {
       if (!silent) setError(syncError.message || 'Could not refresh device notifications.')
