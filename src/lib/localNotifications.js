@@ -6,11 +6,13 @@ const DAILY_ID = 1199000001
 const WEEKLY_ID = 1199000002
 const TEST_ID = 1199000099
 const MAX_SCHEDULED_REMINDERS = 80
+const CHANNEL_ID = 'onevault_reminders_v2'
 
 let pluginPromise
 
 async function getPlugin() {
   if (!Capacitor.isNativePlatform()) return null
+  if (!Capacitor.isPluginAvailable('LocalNotifications')) return null
   if (!pluginPromise) {
     pluginPromise = import('@capacitor/local-notifications').then(module => module.LocalNotifications)
   }
@@ -34,7 +36,7 @@ async function createChannel(plugin) {
 
 export async function requestNotificationPermission() {
   const plugin = await getPlugin()
-  if (!plugin) return { granted: false, native: false }
+  if (!plugin) return { granted: false, native: false, pluginAvailable: false }
 
   const current = await plugin.checkPermissions()
   if (current.display === 'granted') return { granted: true, native: true }
@@ -43,12 +45,54 @@ export async function requestNotificationPermission() {
   return { granted: requested.display === 'granted', native: true }
 }
 
+export async function getNotificationDiagnostics() {
+  const plugin = await getPlugin()
+  if (!plugin) {
+    return {
+      native: Capacitor.isNativePlatform(),
+      pluginAvailable: false,
+      permission: 'unavailable',
+      enabled: false,
+      exactAlarm: { granted: false, supported: false },
+      channels: [],
+      pending: [],
+      delivered: [],
+    }
+  }
+
+  const [permission, enabled, exactAlarm, channels, pending, delivered] = await Promise.all([
+    plugin.checkPermissions().catch(() => ({ display: 'unknown' })),
+    typeof plugin.areEnabled === 'function'
+      ? plugin.areEnabled().catch(() => ({ value: false }))
+      : Promise.resolve({ value: true }),
+    getExactNotificationPermission(),
+    typeof plugin.listChannels === 'function'
+      ? plugin.listChannels().catch(() => ({ channels: [] }))
+      : Promise.resolve({ channels: [] }),
+    plugin.getPending().catch(() => ({ notifications: [] })),
+    typeof plugin.getDeliveredNotifications === 'function'
+      ? plugin.getDeliveredNotifications().catch(() => ({ notifications: [] }))
+      : Promise.resolve({ notifications: [] }),
+  ])
+
+  return {
+    native: true,
+    pluginAvailable: true,
+    permission: permission.display,
+    enabled: Boolean(enabled?.value),
+    exactAlarm,
+    channels: channels?.channels || [],
+    pending: pending?.notifications || [],
+    delivered: delivered?.notifications || [],
+  }
+}
+
 export async function getNotificationPermission() {
   const plugin = await getPlugin()
-  if (!plugin) return { granted: false, native: false }
+  if (!plugin) return { granted: false, native: false, pluginAvailable: false }
 
   const status = await plugin.checkPermissions()
-  return { granted: status.display === 'granted', native: true }
+  return { granted: status.display === 'granted', native: true, pluginAvailable: true }
 }
 
 export async function getExactNotificationPermission() {
@@ -149,7 +193,11 @@ export async function syncLocalNotifications({
   weeklyReview = false,
 } = {}) {
   const plugin = await getPlugin()
-  if (!plugin) return { native: false, scheduled: 0 }
+  if (!plugin) return {
+    native: Capacitor.isNativePlatform(),
+    scheduled: 0,
+    reason: Capacitor.isNativePlatform() ? 'plugin_unavailable' : 'not_native',
+  }
 
   const permission = await plugin.checkPermissions()
   if (permission.display !== 'granted') {
@@ -197,12 +245,13 @@ export async function syncLocalNotifications({
           body: reminder.description
             ? reminder.description + ' · ' + stamp
             : 'Due ' + stamp,
-          channelId: 'onevault_reminders',
+          channelId: CHANNEL_ID,
           schedule: {
             at: due,
             allowWhileIdle: true,
             isExactNotification: true,
             isExactMandatory: true,
+            foreground: true,
           },
           autoCancel: true,
         })
@@ -214,7 +263,7 @@ export async function syncLocalNotifications({
       id: DAILY_ID,
       title: 'OneVault daily review',
       body: 'Take a quick look at today’s reminders, spending and budgets.',
-      channelId: 'onevault_reminders',
+      channelId: CHANNEL_ID,
       schedule: {
         on: { hour: 20, minute: 0 },
         repeats: true,
@@ -229,7 +278,7 @@ export async function syncLocalNotifications({
       id: WEEKLY_ID,
       title: 'OneVault weekly review',
       body: 'Review the week: spending, budgets, reminders and unfinished items.',
-      channelId: 'onevault_reminders',
+      channelId: CHANNEL_ID,
       schedule: {
         on: { weekday: 1, hour: 18, minute: 0 },
         repeats: true,
@@ -265,6 +314,8 @@ export async function syncLocalNotifications({
       pending: pendingAfter.length,
       missing: missingIds.length,
       warning: result.warning || null,
+      warningCode: result.warning?.code || null,
+      warningMessage: result.warning?.message || null,
     }
   } catch (error) {
     return {
@@ -272,6 +323,7 @@ export async function syncLocalNotifications({
       scheduled: 0,
       permission: permission.display,
       exactAlarm: reminderAlerts ? 'unknown' : 'not_required',
+      errorCode: error?.code || null,
       error: error?.message || 'Unable to schedule local notifications.',
     }
   }
@@ -279,16 +331,17 @@ export async function syncLocalNotifications({
 
 export async function scheduleTestNotification() {
   const plugin = await getPlugin()
-  if (!plugin) return { native: false, scheduled: 0, reason: 'not_native' }
+  if (!plugin) {
+    return {
+      native: Capacitor.isNativePlatform(),
+      scheduled: 0,
+      reason: Capacitor.isNativePlatform() ? 'plugin_unavailable' : 'not_native',
+    }
+  }
 
   const permission = await requestNotificationPermission()
   if (!permission.granted) {
     return { native: true, scheduled: 0, reason: 'notification_permission' }
-  }
-
-  const exact = await getExactNotificationPermission()
-  if (exact.supported && !exact.granted) {
-    return { native: true, scheduled: 0, reason: 'exact_alarm_permission' }
   }
 
   await createChannel(plugin)
@@ -301,13 +354,13 @@ export async function scheduleTestNotification() {
       notifications: [{
         id: TEST_ID,
         title: 'OneVault test notification',
-        body: 'If you see this, phone notifications are working.',
-        channelId: 'onevault_reminders',
+        body: 'If you see this in about 10 seconds, native notifications are working.',
+        channelId: CHANNEL_ID,
         schedule: {
           at,
           allowWhileIdle: true,
-          isExactNotification: true,
-          isExactMandatory: true,
+          isExactNotification: false,
+          foreground: true,
         },
         autoCancel: true,
       }],
@@ -321,13 +374,18 @@ export async function scheduleTestNotification() {
       scheduled: scheduled ? 1 : 0,
       reason: scheduled ? 'scheduled' : 'not_pending',
       warning: result.warning || null,
+      warningCode: result.warning?.code || null,
+      warningMessage: result.warning?.message || null,
+      diagnostics: await getNotificationDiagnostics(),
     }
   } catch (error) {
     return {
       native: true,
       scheduled: 0,
       reason: 'schedule_error',
+      errorCode: error?.code || null,
       error: error?.message || 'Unable to schedule test notification.',
+      diagnostics: await getNotificationDiagnostics().catch(() => null),
     }
   }
 }
