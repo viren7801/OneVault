@@ -238,8 +238,6 @@ export async function syncLocalNotifications({
             ? reminder.description + ' · ' + stamp
             : 'Due ' + stamp,
           channelId: CHANNEL_ID,
-          smallIcon: 'ic_stat_onevault',
-          foreground: true,
           schedule: {
             at: due,
             allowWhileIdle: true,
@@ -323,50 +321,80 @@ export async function syncLocalNotifications({
 }
 
 export async function scheduleTestNotification() {
-  const plugin = await getPlugin()
-  if (!plugin) {
-    return {
-      native: Capacitor.isNativePlatform(),
-      scheduled: 0,
-      reason: Capacitor.isNativePlatform() ? 'plugin_unavailable' : 'not_native',
-    }
-  }
-
-  const permission = await requestNotificationPermission()
-  if (!permission.granted) {
-    return { native: true, scheduled: 0, reason: 'notification_permission' }
-  }
-
-  await createChannel(plugin)
-  const at = new Date(Date.now() + 10000)
+  let step = 'checking-native-plugin'
 
   try {
-    await plugin.cancel({ notifications: [{ id: TEST_ID }] })
+    const plugin = await getPlugin()
+    if (!plugin) {
+      return {
+        native: Capacitor.isNativePlatform(),
+        scheduled: 0,
+        reason: Capacitor.isNativePlatform() ? 'plugin_unavailable' : 'not_native',
+        step,
+      }
+    }
 
-    const result = await plugin.schedule({
-      notifications: [{
-        id: TEST_ID,
-        title: 'OneVault test notification',
-        body: 'If you see this in about 10 seconds, native notifications are working.',
-        channelId: CHANNEL_ID,
-        smallIcon: 'ic_stat_onevault',
-        foreground: true,
-        schedule: {
-          at,
-          allowWhileIdle: true,
-          isExactNotification: false,
-        },
-        autoCancel: true,
-      }],
-    })
+    step = 'requesting-notification-permission'
+    const permission = await withTimeout(
+      requestNotificationPermission(),
+      12000,
+      'notification_permission_timeout',
+    )
 
-    const pendingAfter = await getPendingOneVaultNotifications(plugin)
+    if (!permission.granted) {
+      return {
+        native: true,
+        scheduled: 0,
+        reason: 'notification_permission',
+        step,
+      }
+    }
+
+    step = 'creating-channel'
+    await withTimeout(createChannel(plugin), 5000, 'channel_timeout')
+
+    const at = new Date(Date.now() + 10000)
+
+    step = 'cancelling-old-test'
+    await withTimeout(
+      plugin.cancel({ notifications: [{ id: TEST_ID }] }),
+      5000,
+      'cancel_timeout',
+    )
+
+    step = 'scheduling-test'
+    const result = await withTimeout(
+      plugin.schedule({
+        notifications: [{
+          id: TEST_ID,
+          title: 'OneVault test notification',
+          body: 'If you see this in about 10 seconds, native notifications are working.',
+          channelId: CHANNEL_ID,
+          schedule: {
+            at,
+            allowWhileIdle: true,
+            isExactNotification: false,
+          },
+          autoCancel: true,
+        }],
+      }),
+      12000,
+      'schedule_timeout',
+    )
+
+    step = 'checking-pending'
+    const pendingAfter = await withTimeout(
+      getPendingOneVaultNotifications(plugin),
+      5000,
+      'pending_timeout',
+    )
     const scheduled = pendingAfter.some(item => Number(item.id) === TEST_ID)
 
     return {
       native: true,
       scheduled: scheduled ? 1 : 0,
       reason: scheduled ? 'scheduled' : 'not_pending',
+      step,
       warning: result.warning || null,
       warningCode: result.warning?.code || null,
       warningMessage: result.warning?.message || null,
@@ -377,11 +405,25 @@ export async function scheduleTestNotification() {
       native: true,
       scheduled: 0,
       reason: 'schedule_error',
+      step,
       errorCode: error?.code || null,
       error: error?.message || 'Unable to schedule test notification.',
       diagnostics: await getNotificationDiagnostics().catch(() => null),
     }
   }
+}
+
+function withTimeout(promise, ms, code) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => {
+        const error = new Error(code)
+        error.code = code
+        reject(error)
+      }, ms)
+    }),
+  ])
 }
 
 function stableReminderId(id) {
