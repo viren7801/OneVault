@@ -1389,7 +1389,13 @@ function App() {
     const handleRemindersChanged = () => {
       void syncStoredReminderNotifications(user.id).catch(() => {})
     }
+    const handleForeground = () => {
+      if (document.visibilityState !== 'visible') return
+      void syncStoredReminderNotifications(user.id).catch(() => {})
+    }
     window.addEventListener('onevault:reminders-changed', handleRemindersChanged)
+    window.addEventListener('focus', handleForeground)
+    document.addEventListener('visibilitychange', handleForeground)
 
     lastActivityRef.current = Date.now()
     const markActivity = () => { lastActivityRef.current = Date.now() }
@@ -1404,6 +1410,8 @@ function App() {
     return () => {
       events.forEach(event => window.removeEventListener(event, markActivity))
       window.removeEventListener('onevault:reminders-changed', handleRemindersChanged)
+      window.removeEventListener('focus', handleForeground)
+      document.removeEventListener('visibilitychange', handleForeground)
       window.clearInterval(interval)
     }
   }, [user, autoLockMinutes])
