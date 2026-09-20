@@ -496,7 +496,7 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
                 </span>
               </div>
               <div className="notification-device-actions">
-                <button className="secondary-btn" onClick={()=>void testNotification}>Test</button>
+                <button className="secondary-btn" onClick={()=>void testNotification()}>Test</button>
                 <button className={devicePermission.granted ? 'secondary-btn' : 'primary-btn'} onClick={()=>void syncDevice()}>
                   {devicePermission.granted ? (prefs.reminderAlerts && exactPermission.supported && !exactPermission.granted ? 'Allow alarms' : 'Refresh') : 'Enable'}
                 </button>
