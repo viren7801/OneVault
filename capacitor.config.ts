@@ -14,6 +14,9 @@ const config: CapacitorConfig = {
       autoBlockRolledBackBundles: true,
       readyTimeout: 10000,
     },
+    LocalNotifications: {
+      smallIcon: 'ic_stat_onevault',
+    },
   },
 }
 
