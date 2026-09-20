@@ -91,7 +91,7 @@ export async function syncStoredReminderNotifications(userId) {
   if (!permission.granted) return { native: true, scheduled: 0, permission: 'denied' }
 
   let prefs = {
-    reminderAlerts: false,
+    reminderAlerts: true,
     dailyBrief: false,
     weeklyReview: false,
   }
@@ -295,7 +295,7 @@ export async function scheduleTestNotification() {
   const at = new Date(Date.now() + 10000)
 
   try {
-    await cancelOneVaultNotifications(plugin, await plugin.getPending().then(result => result.notifications || []))
+    await plugin.cancel({ notifications: [{ id: TEST_ID }] })
 
     const result = await plugin.schedule({
       notifications: [{
