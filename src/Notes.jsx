@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Archive, Bold, Code2, Copy, FileText, Fingerprint, Folder, FolderPlus,
+  Archive, Bell, Bold, CalendarClock, Code2, Copy, FileText, Fingerprint, Folder, FolderPlus,
   Heading2, Italic, List, ListChecks, Pin, PinOff, Plus, Quote, RefreshCw,
   Search, ShieldCheck, Star, Trash2, Undo2, X, Lock, KeyRound,
 } from 'lucide-react'
@@ -27,6 +27,7 @@ const emptyNote = () => ({
   trashed: false,
   trashed_at: null,
   reminder_at: '',
+  reminder_id: '',
   history: [],
   created_at: '',
   updated_at: '',
@@ -81,6 +82,7 @@ function normalizeNote(note) {
     trashed: Boolean(note.trashed),
     trashed_at: note.trashed_at || null,
     reminder_at: note.reminder_at || '',
+    reminder_id: note.reminder_id || '',
     history: Array.isArray(note.history) ? note.history : [],
     created_at: note.created_at || nowIso(),
     updated_at: note.updated_at || nowIso(),
@@ -112,6 +114,7 @@ export default function Notes({ user }) {
   const [form, setForm] = useState(emptyNote)
   const [tagsInput, setTagsInput] = useState('')
   const [historyNote, setHistoryNote] = useState(null)
+  const [reminderModal, setReminderModal] = useState(null)
   const [saveHint, setSaveHint] = useState('')
   const editorRef = useRef(null)
 
@@ -520,6 +523,8 @@ export default function Notes({ user }) {
       updated_at: now,
       trashed: false,
       trashed_at: null,
+      reminder_at: '',
+      reminder_id: '',
       history: [],
     })
     try {
@@ -533,29 +538,148 @@ export default function Notes({ user }) {
   async function deleteForever(note) {
     if (!window.confirm('Permanently delete “' + (note.title || 'Untitled note') + '”?')) return
     try {
+      if (note.reminder_id) {
+        const { error: reminderDeleteError } = await supabase
+          .from('reminders')
+          .delete()
+          .eq('id', note.reminder_id)
+          .eq('user_id', user.id)
+        if (reminderDeleteError) throw reminderDeleteError
+      }
       const next = notes.filter(item => item.id !== note.id)
       await persist(next)
       setSelectedId(next[0]?.id || null)
+      window.dispatchEvent(new CustomEvent('onevault:reminders-changed'))
     } catch (err) {
       setError(err.message || 'Could not delete note.')
     }
   }
 
-  async function createReminder(note) {
-    if (!note.reminder_at) return
-    const { error: reminderError } = await supabase.from('reminders').insert({
-      id: crypto.randomUUID(),
-      user_id: user.id,
-      title: note.title || 'Note reminder',
-      description: note.content?.slice(0, 250) || null,
-      due_at: note.reminder_at,
-      repeat_rule: null,
-      priority: 'medium',
-      completed: false,
-      notify_telegram: false,
+  function defaultReminderLocal() {
+    const date = new Date(Date.now() + 60 * 60 * 1000)
+    date.setSeconds(0, 0)
+    date.setMinutes(Math.ceil(date.getMinutes() / 5) * 5)
+    return toLocal(date)
+  }
+
+  function openReminderModal(note) {
+    setError('')
+    setReminderModal({
+      note,
+      due_at: toLocal(note.reminder_at) || defaultReminderLocal(),
     })
-    if (reminderError) setError(reminderError.message)
-    else setSaveHint('Reminder created')
+  }
+
+  function closeReminderModal() {
+    setReminderModal(null)
+    setError('')
+  }
+
+  async function saveNoteReminder(event) {
+    event?.preventDefault?.()
+    if (!reminderModal?.note) return
+
+    const due = new Date(reminderModal.due_at)
+    if (!reminderModal.due_at || Number.isNaN(due.getTime())) {
+      return setError('Choose a valid reminder date and time.')
+    }
+    if (due.getTime() <= Date.now()) {
+      return setError('Reminder date and time must be in the future.')
+    }
+
+    setBusy(true)
+    setError('')
+
+    try {
+      const note = reminderModal.note
+      const description = String(note.content || '').trim() || null
+      const reminderPayload = {
+        title: note.title || 'Note reminder',
+        description,
+        due_at: due.toISOString(),
+      }
+
+      let reminder = null
+
+      if (note.reminder_id) {
+        const { data, error: updateError } = await supabase
+          .from('reminders')
+          .update(reminderPayload)
+          .eq('id', note.reminder_id)
+          .eq('user_id', user.id)
+          .select()
+          .maybeSingle()
+
+        if (updateError) throw updateError
+        reminder = data || null
+      }
+
+      if (!reminder) {
+        const { data, error: insertError } = await supabase
+          .from('reminders')
+          .insert({
+            id: crypto.randomUUID(),
+            user_id: user.id,
+            ...reminderPayload,
+            repeat_rule: null,
+            priority: 'medium',
+            completed: false,
+            notify_telegram: false,
+          })
+          .select()
+          .single()
+
+        if (insertError) throw insertError
+        reminder = data
+      }
+
+      const updatedNote = {
+        ...note,
+        reminder_at: reminder.due_at,
+        reminder_id: reminder.id,
+        updated_at: nowIso(),
+      }
+
+      const nextNotes = notes.map(item => item.id === note.id ? updatedNote : item)
+      await persist(nextNotes)
+      setSelectedId(note.id)
+      setReminderModal(null)
+      setSaveHint('Reminder scheduled')
+      window.dispatchEvent(new CustomEvent('onevault:reminders-changed'))
+    } catch (err) {
+      setError(err.message || 'Could not create the reminder.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function removeNoteReminder() {
+    const note = reminderModal?.note
+    if (!note) return
+
+    setBusy(true)
+    setError('')
+    try {
+      if (note.reminder_id) {
+        const { error: deleteError } = await supabase
+          .from('reminders')
+          .delete()
+          .eq('id', note.reminder_id)
+          .eq('user_id', user.id)
+
+        if (deleteError) throw deleteError
+      }
+
+      const updatedNote = { ...note, reminder_at: '', reminder_id: '', updated_at: nowIso() }
+      await persist(notes.map(item => item.id === note.id ? updatedNote : item))
+      setSelectedId(note.id)
+      setReminderModal(null)
+      window.dispatchEvent(new CustomEvent('onevault:reminders-changed'))
+    } catch (err) {
+      setError(err.message || 'Could not remove the reminder.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   function addFolder() {
@@ -712,7 +836,7 @@ export default function Notes({ user }) {
             {selected.trashed && <button className="mini-btn danger" onClick={()=>void deleteForever(selected)} title="Delete permanently"><X size={13}/></button>}
           </div></div>
           <div className="note-preview"><pre>{selected.content||'This note is empty.'}</pre></div>
-          <div className="note-detail-footer"><div><span>{wordCount(selected.content)} words</span><span>{String(selected.content||'').length} characters</span><span>Updated {dateLabel(selected.updated_at)}</span></div><div><button className="text-btn" onClick={()=>exportNote(selected)}>Export</button>{selected.reminder_at&&<button className="text-btn" onClick={()=>void createReminder(selected)}>Create reminder</button>}{selected.history?.length>0&&<button className="text-btn" onClick={()=>setHistoryNote(selected)}>History ({selected.history.length})</button>}</div></div>
+          <div className="note-detail-footer"><div><span>{wordCount(selected.content)} words</span><span>{String(selected.content||'').length} characters</span><span>Updated {dateLabel(selected.updated_at)}</span>{selected.reminder_at&&<span><CalendarClock size={12}/> {new Date(selected.reminder_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit'})}</span>}</div><div><button className="text-btn" onClick={()=>exportNote(selected)}>Export</button>{!selected.trashed&&<button className="text-btn" onClick={()=>openReminderModal(selected)}><Bell size={13}/>{selected.reminder_at?'Edit reminder':'Move to reminder'}</button>}{selected.history?.length>0&&<button className="text-btn" onClick={()=>setHistoryNote(selected)}>History ({selected.history.length})</button>}</div></div>
         </div> : <div className="empty-state"><div className="empty-icon"><FileText size={24}/></div><h4>Select a note</h4><p>Your note details and actions will appear here.</p></div>}
       </section>
     </div>
