@@ -847,7 +847,7 @@ export default function Notes({ user }) {
         <label><span>Title</span><input autoFocus value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="Note title"/></label>
         <div className="notes-editor-meta">
           <div><span>Folder</span><div className="inline-control"><select value={form.folder} onChange={e=>setForm({...form,folder:e.target.value})}>{folders.map(item=><option key={item}>{item}</option>)}</select><button type="button" className="icon-btn small" onClick={addFolder}><FolderPlus size={13}/></button></div></div>
-          <div><span>Reminder</span><input type="datetime-local" value={form.reminder_at} onChange={e=>setForm({...form,reminder_at:e.target.value})}/></div>
+          <div><span>Reminder</span><div className="inline-control"><span className="modal-subtle">{editing?.reminder_at?'Already scheduled':'Save the note first, then move it to Reminders.'}</span>{editing&&<button type="button" className="secondary-btn compact" onClick={()=>openReminderModal(editing)}><Bell size={13}/>{editing.reminder_at?'Edit':'Move to reminder'}</button>}</div></div>
         </div>
         <label><span>Tags</span><input value={tagsInput} onChange={e=>setTagsInput(e.target.value)} placeholder="project, ideas, important"/></label>
         <div className="markdown-toolbar">
@@ -865,6 +865,16 @@ export default function Notes({ user }) {
         {saveHint&&<div className="telegram-notice">{saveHint}</div>}
         {error&&<div className="form-error">{error}</div>}
         <div className="modal-actions"><button type="button" className="secondary-btn" onClick={closeEditor}>Cancel</button><button className="primary-btn" disabled={busy}>{busy?'Saving…':editing?'Save changes':'Create note'}</button></div>
+      </form>
+    </div></div>}
+
+    {reminderModal && <div className="modal-layer"><div className="modal note-reminder-modal">
+      <div className="modal-header"><div><div className="panel-kicker">NOTE REMINDER</div><h3>{reminderModal.note.title||'Untitled note'}</h3><p className="modal-subtle">Move this note into Reminders and choose exactly when OneVault should alert you.</p></div><button className="icon-btn" onClick={closeReminderModal}><X size={18}/></button></div>
+      <form onSubmit={saveNoteReminder} className="expense-form">
+        <div className="note-reminder-source"><div><span>Note preview</span><strong>{reminderModal.note.content?.trim()||'This note is empty.'}</strong></div><CalendarClock size={20}/></div>
+        <label><span>Date & time</span><input type="datetime-local" autoFocus value={reminderModal.due_at} min={toLocal(new Date())} onChange={e=>setReminderModal(value=>({...value,due_at:e.target.value}))}/></label>
+        {error&&<div className="form-error">{error}</div>}
+        <div className="modal-actions"><button type="button" className="secondary-btn" onClick={closeReminderModal} disabled={busy}>Cancel</button>{reminderModal.note.reminder_id&&<button type="button" className="secondary-btn" onClick={()=>void removeNoteReminder()} disabled={busy}>Remove reminder</button>}<button className="primary-btn" disabled={busy}>{busy?'Saving…':reminderModal.note.reminder_id?'Update reminder':'Move to reminder'}</button></div>
       </form>
     </div></div>}
 
