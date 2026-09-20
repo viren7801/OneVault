@@ -251,7 +251,6 @@ export async function syncLocalNotifications({
             allowWhileIdle: true,
             isExactNotification: true,
             isExactMandatory: true,
-            foreground: true,
           },
           autoCancel: true,
         })
@@ -268,7 +267,6 @@ export async function syncLocalNotifications({
         on: { hour: 20, minute: 0 },
         repeats: true,
         isExactNotification: false,
-        foreground: true,
       },
       autoCancel: true,
     })
