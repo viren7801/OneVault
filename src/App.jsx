@@ -17,6 +17,7 @@ import PasskeyManager from './PasskeyManager'
 import Dashboard from './Dashboard'
 import BrainModal from './BrainModal'
 import NotificationsCenter from './NotificationsCenter'
+import { syncStoredReminderNotifications } from './lib/localNotifications'
 
 const modules = [
   { id: 'home', label: 'Home', icon: LayoutDashboard, description: 'Your private overview' },
@@ -1378,6 +1379,14 @@ function App() {
 
   useEffect(() => {
     if (!user) return undefined
+
+    void syncStoredReminderNotifications(user.id).catch(() => {})
+
+    const handleRemindersChanged = () => {
+      void syncStoredReminderNotifications(user.id).catch(() => {})
+    }
+    window.addEventListener('onevault:reminders-changed', handleRemindersChanged)
+
     lastActivityRef.current = Date.now()
     const markActivity = () => { lastActivityRef.current = Date.now() }
     const events = ['pointerdown', 'keydown', 'touchstart', 'mousemove']
@@ -1390,6 +1399,7 @@ function App() {
     }, 15000)
     return () => {
       events.forEach(event => window.removeEventListener(event, markActivity))
+      window.removeEventListener('onevault:reminders-changed', handleRemindersChanged)
       window.clearInterval(interval)
     }
   }, [user, autoLockMinutes])
