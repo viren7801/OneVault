@@ -302,8 +302,8 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
   }
 
   async function testNotification() {
-    setNotice('')
     setError('')
+    setNotice('Testing native notifications…')
 
     try {
       const result = await scheduleTestNotification()
@@ -328,6 +328,7 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
         setError(
           'Test notification failed' +
           (result.errorCode ? ' [' + result.errorCode + ']' : '') +
+          ' at ' + (result.step || 'unknown step') +
           ': ' + (result.error || 'Unknown native scheduling error.')
         )
         return
@@ -343,7 +344,7 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
       const deliveredCount = diagnostics?.delivered?.length ?? 0
       const channelCount = diagnostics?.channels?.length ?? 0
       setError(
-        'The notification was not left pending. ' +
+        'The notification was not left pending at ' + (result.step || 'unknown step') + '. ' +
         'enabled=' + String(diagnostics?.enabled ?? false) +
         ', permission=' + String(diagnostics?.permission ?? 'unknown') +
         ', channels=' + String(channelCount) +
