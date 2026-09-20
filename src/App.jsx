@@ -784,6 +784,7 @@ function ReminderModal({ user, initial, onClose, onSaved, telegramConnected }) {
       }
 
       onSaved(savedReminder, initial || null)
+      window.dispatchEvent(new CustomEvent('onevault:reminders-changed'))
       onClose()
     } catch (err) {
       setError(err.message || 'Unable to save reminder.')
