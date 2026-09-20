@@ -459,11 +459,6 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
   useEffect(() => {
     void refreshPermission()
     void loadCenter()
-    const interval = window.setInterval(() => {
-      void loadCenter({ silent: true })
-      void syncFromPrefs()
-    }, 60000)
-
     function handleRemindersChanged() {
       void loadCenter({ silent: true })
       void syncFromPrefs({ silent: true })
@@ -480,7 +475,6 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
     void syncFromPrefs()
 
     return () => {
-      window.clearInterval(interval)
       window.removeEventListener('onevault:reminders-changed', handleRemindersChanged)
       window.removeEventListener('focus', handleForeground)
       document.removeEventListener('visibilitychange', handleForeground)
