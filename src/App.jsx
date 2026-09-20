@@ -1087,6 +1087,7 @@ function Reminders({ user }) {
       } else {
         setReminders(items => items.map(item => item.id === reminder.id ? data : item))
       }
+      window.dispatchEvent(new CustomEvent('onevault:reminders-changed'))
     } catch (err) { setError(err.message || 'Unable to update reminder.') }
   }
 
@@ -1104,6 +1105,7 @@ function Reminders({ user }) {
       }).eq('id', reminder.id).eq('user_id', user.id).select().single()
       if (error) throw error
       setReminders(items => items.map(item => item.id === reminder.id ? data : item))
+      window.dispatchEvent(new CustomEvent('onevault:reminders-changed'))
     } catch (err) { setError(err.message || 'Unable to snooze reminder.') }
   }
 
@@ -1112,6 +1114,7 @@ function Reminders({ user }) {
     const { error } = await supabase.from('reminders').delete().eq('id', reminder.id).eq('user_id', user.id)
     if (error) { setError(error.message); return }
     setReminders(items => items.filter(item => item.id !== reminder.id))
+    window.dispatchEvent(new CustomEvent('onevault:reminders-changed'))
     if (modal?.id === reminder.id) setModal(null)
   }
 
