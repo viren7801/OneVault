@@ -16,6 +16,9 @@ on:
       - android/**
       - src/lib/nativePasskeys.js
       - src/lib/liveUpdates.js
+      - src/lib/localNotifications.js
+      - src/NotificationsCenter.jsx
+      - src/App.jsx
       - src/UpdateCenter.jsx
       - src/updateCenter.css
       - src/styles.css
