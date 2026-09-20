@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core'
+import { supabase } from './supabase'
 
 const REMINDER_BASE = 1100000000
 const DAILY_ID = 1199000001
@@ -47,6 +48,52 @@ export async function getNotificationPermission() {
 
   const status = await plugin.checkPermissions()
   return { granted: status.display === 'granted', native: true }
+}
+
+export async function getExactNotificationPermission() {
+  const plugin = await getPlugin()
+  if (!plugin || typeof plugin.checkExactNotificationSetting !== 'function') {
+    return { granted: true, native: Boolean(plugin), supported: false }
+  }
+
+  try {
+    const status = await plugin.checkExactNotificationSetting()
+    return { granted: status.exact_alarm === 'granted', native: true, supported: true }
+  } catch {
+    return { granted: false, native: true, supported: true }
+  }
+}
+
+export async function syncStoredReminderNotifications(userId) {
+  if (!userId) return { native: false, scheduled: 0 }
+
+  const permission = await getNotificationPermission()
+  if (!permission.granted) return { native: true, scheduled: 0, permission: 'denied' }
+
+  let prefs = {
+    reminderAlerts: false,
+    dailyBrief: false,
+    weeklyReview: false,
+  }
+
+  try {
+    const raw = window.localStorage.getItem('onevault:notification-prefs:' + userId)
+    prefs = { ...prefs, ...(raw ? JSON.parse(raw) : {}) }
+  } catch {}
+
+  const { data: reminders, error } = await supabase
+    .from('reminders')
+    .select('id,title,description,due_at,completed')
+    .eq('user_id', userId)
+    .order('due_at', { ascending: true })
+    .limit(1000)
+
+  if (error) throw error
+
+  return syncLocalNotifications({
+    reminders: reminders || [],
+    ...prefs,
+  })
 }
 
 function isOneVaultId(id) {
@@ -114,7 +161,7 @@ export async function syncLocalNotifications({
           schedule: {
             at: due,
             allowWhileIdle: true,
-            isExactNotification: false,
+            isExactNotification: true,
           },
           autoCancel: true,
         })
