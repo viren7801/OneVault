@@ -22,7 +22,7 @@ async function getPlugin() {
 async function createChannel(plugin) {
   try {
     await plugin.createChannel({
-      id: 'onevault_reminders',
+      id: CHANNEL_ID,
       name: 'OneVault reminders',
       description: 'Reminders, daily reviews and OneVault alerts',
       importance: 4,
@@ -268,6 +268,7 @@ export async function syncLocalNotifications({
         on: { hour: 20, minute: 0 },
         repeats: true,
         isExactNotification: false,
+        foreground: true,
       },
       autoCancel: true,
     })
