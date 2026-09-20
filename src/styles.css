@@ -3776,3 +3776,52 @@ body{overscroll-behavior-x:none}
     -webkit-tap-highlight-color: transparent;
   }
 }
+
+
+/* --- Mobile calendar preview: body-level sheet --- */
+.mobile-calendar-preview-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 310;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 10px calc(86px + env(safe-area-inset-bottom));
+  background: rgba(0,0,0,.24);
+  backdrop-filter: blur(7px) saturate(115%);
+  -webkit-backdrop-filter: blur(7px) saturate(115%);
+}
+
+.mobile-calendar-preview {
+  width: min(100%, 520px);
+  max-height: min(45dvh, 390px);
+  overflow: auto;
+  padding: 15px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 22px 22px 18px 18px;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.09), rgba(255,255,255,.025)),
+    rgba(17,17,22,.94);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.14),
+    0 28px 80px rgba(0,0,0,.5);
+  backdrop-filter: blur(28px) saturate(145%);
+  -webkit-backdrop-filter: blur(28px) saturate(145%);
+  animation: oneVaultSpringIn .24s cubic-bezier(.22,1,.36,1) both;
+}
+
+@media (max-width:760px) {
+  .mobile-calendar-preview-layer {
+    display: flex;
+  }
+
+  .calendar-panel .calendar-preview {
+    display: none !important;
+  }
+}
+
+@media (min-width:761px) {
+  .mobile-calendar-preview-layer {
+    display: none !important;
+  }
+}
