@@ -6,7 +6,7 @@ const DAILY_ID = 1199000001
 const WEEKLY_ID = 1199000002
 const TEST_ID = 1199000099
 const MAX_SCHEDULED_REMINDERS = 80
-const CHANNEL_ID = 'onevault_reminders_v2'
+const CHANNEL_ID = 'onevault_reminders_v3'
 
 let pluginPromise
 
@@ -206,17 +206,9 @@ export async function syncLocalNotifications({
 
   await createChannel(plugin)
 
+  let exact = { granted: true, supported: false }
   if (reminderAlerts) {
-    const exact = await getExactNotificationPermission()
-    if (exact.supported && !exact.granted) {
-      return {
-        native: true,
-        scheduled: 0,
-        permission: permission.display,
-        exactAlarm: 'denied',
-        requiresExactAlarm: true,
-      }
-    }
+    exact = await getExactNotificationPermission()
   }
 
   const pending = await plugin.getPending()
@@ -246,11 +238,13 @@ export async function syncLocalNotifications({
             ? reminder.description + ' · ' + stamp
             : 'Due ' + stamp,
           channelId: CHANNEL_ID,
+          smallIcon: 'ic_stat_onevault',
+          foreground: true,
           schedule: {
             at: due,
             allowWhileIdle: true,
-            isExactNotification: true,
-            isExactMandatory: true,
+            isExactNotification: exact.granted,
+            isExactMandatory: exact.granted,
           },
           autoCancel: true,
         })
@@ -309,7 +303,7 @@ export async function syncLocalNotifications({
       native: true,
       scheduled: result.notifications?.length || 0,
       permission: permission.display,
-      exactAlarm: reminderAlerts ? 'granted' : 'not_required',
+      exactAlarm: reminderAlerts ? (exact.supported ? (exact.granted ? 'granted' : 'denied_fallback_inexact') : 'unsupported') : 'not_required',
       pending: pendingAfter.length,
       missing: missingIds.length,
       warning: result.warning || null,
@@ -355,6 +349,8 @@ export async function scheduleTestNotification() {
         title: 'OneVault test notification',
         body: 'If you see this in about 10 seconds, native notifications are working.',
         channelId: CHANNEL_ID,
+        smallIcon: 'ic_stat_onevault',
+        foreground: true,
         schedule: {
           at,
           allowWhileIdle: true,
