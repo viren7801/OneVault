@@ -255,8 +255,7 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
         const exact = await requestExactNotificationPermission()
         setExactPermission(exact)
         if (exact.supported && !exact.granted) {
-          setNotice('Exact alarms are required for on-time reminders. Enable “Alarms & reminders” for OneVault, then press Enable again.')
-          return
+          setNotice('Exact alarms are off, so OneVault will use an inexact reminder fallback. Enable “Alarms & reminders” for tighter timing.')
         }
       }
 
@@ -275,8 +274,7 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
       })
 
       if (syncResult.requiresExactAlarm) {
-        setNotice('OneVault cannot arm exact reminders until “Alarms & reminders” is enabled for the app.')
-        return
+        setNotice('Exact alarms are off. OneVault could not arm the exact schedule.')
       }
 
       if (syncResult.error) {
@@ -414,11 +412,7 @@ export default function NotificationsCenter({ user, open, onOpen, onClose, onNav
         const exact = await requestExactNotificationPermission()
         setExactPermission(exact)
         if (exact.supported && !exact.granted) {
-          const reverted = { ...next, [key]: false }
-          setPrefs(reverted)
-          savePrefs(user.id, reverted)
-          setNotice('Enable “Alarms & reminders” for OneVault before turning on reminder alerts.')
-          return
+          setNotice('Exact alarms are off. Reminder alerts stay enabled using an inexact fallback; enable “Alarms & reminders” for tighter timing.')
         }
       }
     }
