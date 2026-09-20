@@ -689,6 +689,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .note-editor-textarea:focus{border-color:rgba(181,170,255,.42);box-shadow:0 0 0 3px rgba(112,71,255,.10)}
 .note-editor-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;color:#696973;font-size:8px}
 .note-history-modal{width:min(700px,100%)}
+.note-reminder-modal{width:min(620px,100%)}
+.note-reminder-source{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:14px;border:1px solid rgba(255,255,255,.07);border-radius:15px;background:rgba(255,255,255,.025);margin-bottom:12px}
+.note-reminder-source>div{display:grid;gap:5px;min-width:0}
+.note-reminder-source span{color:#85858e;font-size:10px;text-transform:uppercase;letter-spacing:.12em}
+.note-reminder-source strong{font-size:13px;line-height:1.45;color:#e9e9ee;white-space:pre-wrap;overflow:hidden;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical}
+.note-reminder-source>svg{flex:none;color:#a8a8b5;margin-top:2px}
 .history-list{display:grid;gap:8px;max-height:60vh;overflow:auto}
 .history-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:12px;border:1px solid rgba(255,255,255,.06);border-radius:11px;background:rgba(255,255,255,.025)}
 .history-row strong,.history-row small,.history-row p{display:block}
