@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Capacitor } from '@capacitor/core'
 import {
   Bell, Bookmark, CalendarDays, Check, ChevronRight, CircleDollarSign, CreditCard, Edit3, Fingerprint,
@@ -836,6 +837,7 @@ function Reminders({ user }) {
   const [viewDate, setViewDate] = useState(startOfDay(new Date()))
   const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()))
   const [hoveredDate, setHoveredDate] = useState(null)
+  const [mobilePreviewDay, setMobilePreviewDay] = useState(null)
   const hoverVibrationRef = useRef(null)
   const [modal, setModal] = useState(null)
   const [telegramConnected, setTelegramConnected] = useState(false)
@@ -1011,6 +1013,7 @@ function Reminders({ user }) {
     const nextDate = startOfDay(day)
     setSelectedDate(nextDate)
     setHoveredDate(reminderDateKey(day))
+    setMobilePreviewDay(new Date(day))
     hoverVibrationRef.current = reminderDateKey(day)
     try {
       if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
@@ -1185,6 +1188,43 @@ function Reminders({ user }) {
         </section>
       </aside>
     </div>
+
+    {mobilePreviewDay && typeof document !== 'undefined' && createPortal(
+      <div className="mobile-calendar-preview-layer" onMouseDown={()=>setMobilePreviewDay(null)}>
+        <section className="mobile-calendar-preview" onMouseDown={event=>event.stopPropagation()}>
+          {(() => {
+            const day = mobilePreviewDay
+            const previewItems = reminders
+              .filter(r => sameCalendarDay(r.due_at, day))
+              .sort((a,b)=>new Date(a.due_at)-new Date(b.due_at))
+            return <>
+              <div className="calendar-preview-head">
+                <strong>{day.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})}</strong>
+                <span>{previewItems.length ? `${previewItems.length} reminder${previewItems.length===1?'':'s'}` : 'Nothing scheduled'}</span>
+              </div>
+              {previewItems.length===0
+                ? <div className="calendar-preview-empty">No reminders</div>
+                : <div className="calendar-preview-list">
+                    {previewItems.slice(0,6).map(item=>(
+                      <div className={`calendar-preview-item ${item.completed?'done':''}`} key={item.id}>
+                        <i className={`priority-dot ${item.priority||'medium'}`}/>
+                        <div>
+                          <strong>{item.title}</strong>
+                          <span>{formatReminderTime(item.due_at)}{item.completed?' · Done':''}{item.notify_telegram?' · Telegram':''}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {previewItems.length>6&&<div className="calendar-preview-more">+{previewItems.length-6} more</div>}
+                  </div>}
+              <button type="button" className="calendar-preview-add" onClick={()=>{setMobilePreviewDay(null);setModal(reminderDraftForDay(day))}}>
+                <Plus size={15}/> Add reminder
+              </button>
+            </>
+          })()}
+        </section>
+      </div>,
+      document.body,
+    )}
 
     {telegramModal&&<div className="modal-layer"><div className="modal telegram-modal">
       <div className="modal-header">
